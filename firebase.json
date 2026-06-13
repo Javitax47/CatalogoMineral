@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "catalogomineral-4b80f",
     "public": "public",
     "ignore": [
       "firebase.json",
