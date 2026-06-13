@@ -1,0 +1,2067 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Catálogo de Minerales</title>
+
+    <meta name="theme-color" content="#039be5" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
+    <!-- Librerías para exportar a PDF y optimización de imágenes -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+        padding-bottom: 2rem;
+      }
+      .modal-backdrop {
+        background-color: rgba(0, 0, 0, 0.6);
+      }
+      .card-enter {
+        animation: fadeIn 0.5s ease-in-out;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+      .mineral-details {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.7s ease-in-out, padding 0.7s ease-in-out;
+        padding-top: 0;
+        padding-bottom: 0;
+      }
+      .is-expanded .mineral-details {
+        max-height: 3000px; /* Aumentado drásticamente para evitar cortes */
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+      }
+      .is-expanded .arrow-icon {
+        transform: rotate(180deg);
+      }
+      .arrow-icon {
+        transition: transform 0.5s ease;
+      }
+      .notification {
+        animation: slideIn 0.5s ease-in-out,
+          fadeOut 0.5s ease-in-out 4.5s forwards;
+      }
+      @keyframes slideIn {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+      @keyframes fadeOut {
+        from {
+          opacity: 1;
+        }
+        to {
+          opacity: 0;
+        }
+      }
+      .lightbox {
+        background-color: rgba(0, 0, 0, 0.85);
+        animation: fadeIn 0.3s ease-in-out;
+      }
+      .lightbox-img {
+        max-width: 90vw;
+        max-height: 80vh;
+      }
+      details > summary {
+        cursor: pointer;
+      }
+      /* Estilos para Drag & Drop de imágenes */
+      .image-draggable {
+        cursor: move;
+        border: 2px solid transparent;
+        touch-action: none; /* Previene el scroll en móvil al tocar el elemento */
+      }
+      .image-draggable.dragging {
+        opacity: 0.5;
+        border-color: #3b82f6;
+      }
+      .image-draggable.drag-over {
+        transform: scale(1.05);
+        border-color: #22c55e;
+      }
+      /* Estilo para el 'fantasma' en el drag táctil */
+      .touch-drag-ghost {
+        position: absolute;
+        pointer-events: none;
+        z-index: 9999;
+        opacity: 0.8;
+      }
+      /* Estilos para LQIP (Low Quality Image Placeholder) */
+      .lazy-image {
+        filter: blur(20px);
+        transition: filter 0.3s ease-in-out;
+      }
+      .lazy-image.is-loaded {
+        filter: blur(0);
+      }
+    </style>
+  </head>
+
+  <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+    <nav class="absolute top-4 right-4 text-right z-10">
+      <div id="menu-container" class="relative inline-block text-left">
+        <button
+          id="menu-button"
+          type="button"
+          class="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600"
+        >
+          Menú
+          <svg
+            class="-mr-1 ml-2 h-5 w-5"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </button>
+        <div
+          id="menu-dropdown"
+          class="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 hidden"
+        >
+          <div class="py-1" role="menu" aria-orientation="vertical">
+            <a
+              href="/catalog.html"
+              class="text-gray-700 dark:text-gray-200 block px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700"
+              role="menuitem"
+              >Catálogo Principal</a
+            >
+            <a
+              href="/stats.html"
+              class="text-gray-700 dark:text-gray-200 block px-4 py-2 text-sm"
+              role="menuitem"
+              >Estadísticas</a
+            >
+            <button
+              id="share-catalog-btn"
+              class="text-left w-full text-gray-700 dark:text-gray-200 block px-4 py-2 text-sm"
+              role="menuitem"
+            >
+              Compartir Catálogo
+            </button>
+            <a
+              id="auth-link"
+              href="/login.html"
+              class="text-gray-700 dark:text-gray-200 block px-4 py-2 text-sm"
+              role="menuitem"
+              >Iniciar Sesión</a
+            >
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container mx-auto pt-16 p-4 md:p-8">
+      <header class="text-center mb-4">
+        <h1
+          class="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white"
+        >
+          Catálogo de Minerales
+        </h1>
+        <p class="text-gray-600 dark:text-gray-400 mt-2">
+          Registra, admira y comparte tu colección de rocas y minerales en todos tus dispositivos donde sea que vayas
+        </p>
+      </header>
+
+      <div
+        id="sync-status"
+        class="flex items-center justify-center mb-4 p-2 bg-gray-200 dark:bg-gray-700 rounded-lg"
+      >
+        <div
+          id="sync-status-dot"
+          class="w-3 h-3 rounded-full bg-yellow-500 mr-2"
+        ></div>
+        <span id="sync-status-text" class="text-sm font-medium"
+          >Inicializando...</span
+        >
+      </div>
+
+      <div class="mb-8 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+        <div
+          class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-4 items-center"
+        >
+          <button
+            id="addMineralBtn"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg"
+            disabled
+          >
+            Añadir Mineral
+          </button>
+          <button
+            id="importBtn"
+            class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg"
+            disabled
+          >
+            Importar Catálogo
+          </button>
+          <input type="file" id="importFile" class="hidden" accept=".json" />
+          <button
+            id="exportBtn"
+            class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg"
+            disabled
+          >
+            Exportar Catálogo
+          </button>
+        </div>
+
+        <details class="mt-4">
+          <summary class="font-semibold text-lg py-2">
+            Opciones de Filtrado
+          </summary>
+          <div
+            class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2 items-end border-t pt-4"
+          >
+            <div class="md:col-span-3">
+              <label for="searchInput" class="block text-sm font-medium"
+                >Buscar por nombre</label
+              >
+              <input
+                type="text"
+                id="searchInput"
+                placeholder="Ej: Cuarzo"
+                class="mt-1 block w-full bg-gray-50 dark:bg-gray-700 border-gray-300 rounded-md shadow-sm py-2 px-3"
+              />
+            </div>
+            <!-- Contenedor para filtros, incluido el de favoritos -->
+            <div class="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="flex items-center justify-start pt-6">
+                <input type="checkbox" id="filter-favorites" class="h-5 w-5 rounded text-blue-600 focus:ring-blue-500 border-gray-300">
+                <label for="filter-favorites" class="ml-2 block text-sm font-medium">Mostrar solo favoritos</label>
+              </div>
+              <div id="dynamic-filters-container" class="contents"></div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium">&nbsp;</label>
+              <button
+                id="resetFiltersBtn"
+                class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg h-full"
+              >
+                Limpiar Filtros
+              </button>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div
+        id="mineral-catalog"
+        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start"
+      ></div>
+      <div id="loading-indicator" class="text-center py-12">
+        <p class="text-lg text-gray-500">Autenticando usuario...</p>
+      </div>
+      <div id="no-results-message" class="hidden text-center py-12">
+        <p class="text-lg text-gray-500">No se encontraron minerales.</p>
+      </div>
+    </div>
+
+    <!-- Modales -->
+    <div
+      id="mineralModal"
+      class="fixed inset-0 z-50 items-center justify-center flex hidden modal-backdrop"
+    >
+      <div
+        class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 w-full max-w-lg m-4 max-h-[90vh] overflow-y-auto"
+      >
+        <h2 id="modalTitle" class="text-2xl font-bold mb-6"></h2>
+        <form id="mineralForm">
+          <input type="hidden" id="mineralId" />
+          <div class="space-y-4">
+            <div>
+              <label for="name" class="block text-sm font-medium"
+                >Nombre <span class="text-red-500"></span></label
+              ><input
+                type="text"
+                id="name"
+                required
+                class="mt-1 block w-full bg-gray-50 dark:bg-gray-700 border-gray-300 rounded-md shadow-sm py-2 px-3"
+              />
+            </div>
+            <div>
+              <label for="formula" class="block text-sm font-medium"
+                >Fórmula</label
+              ><input
+                type="text"
+                id="formula"
+                class="mt-1 block w-full bg-gray-50 dark:bg-gray-700 border-gray-300 rounded-md shadow-sm py-2 px-3"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2"
+                >Imágenes (Arrastra para reordenar, la primera es la principal)</label
+              >
+              <div
+                id="existing-images-container"
+                class="grid grid-cols-3 gap-2 bg-gray-100 dark:bg-gray-900/50 p-2 rounded-md"
+              ></div>
+            </div>
+            <div>
+              <label for="imageFiles" class="block text-sm font-medium"
+                >Añadir Nuevas Imágenes</label
+              ><input
+                type="file"
+                id="imageFiles"
+                accept="image/*"
+                multiple
+                class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+            </div>
+            
+            <!-- Gestión de Etiquetas -->
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <label class="block text-sm font-medium mb-2">Etiquetas de Clasificación</label>
+              <div id="tags-container" class="space-y-2"></div>
+              <div class="flex items-center gap-2 mt-2">
+                  <input type="text" id="new-tag-name" placeholder="Nombre de etiqueta" class="flex-grow bg-gray-50 dark:bg-gray-700 rounded-md py-1 px-2 text-sm">
+                  <input type="color" id="new-tag-color" value="#4b5563" class="bg-gray-50 dark:bg-gray-700 rounded-md h-8 w-10 cursor-pointer">
+                  <button type="button" id="add-tag-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-1 px-3 rounded-lg text-sm">Añadir</button>
+              </div>
+            </div>
+            
+            <div
+              id="custom-fields-form-container"
+              class="space-y-4 border-t border-gray-200 dark:border-gray-700 pt-4 mt-4"
+            ></div>
+            <button type="button" id="manage-fields-btn-modal" class="w-full text-sm bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg mt-4">Gestionar Campos de Datos</button>
+          </div>
+          <div class="mt-8 flex justify-end space-x-4">
+            <button
+              type="button"
+              id="cancelBtn"
+              class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg"
+            >
+              Cancelar</button
+            ><button
+              type="submit"
+              id="submitBtn"
+              class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center"
+            >
+              <span id="submitBtnText">Guardar</span>
+              <svg id="submitBtnSpinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div
+      id="lightbox-modal"
+      class="fixed inset-0 z-[100] items-center justify-center hidden lightbox"
+    >
+      <img
+        id="lightbox-img"
+        class="lightbox-img object-contain"
+        src=""
+      /><button
+        id="lightbox-close"
+        class="absolute top-4 right-6 text-white text-4xl font-bold hover:text-gray-300"
+      >
+        &times;</button
+      ><button
+        id="lightbox-prev"
+        class="absolute left-4 top-1/2 -translate-y-1/2 text-white text-5xl font-bold hover:text-gray-300"
+      >
+        &#8249;</button
+      ><button
+        id="lightbox-next"
+        class="absolute right-4 top-1/2 -translate-y-1/2 text-white text-5xl font-bold hover:text-gray-300"
+      >
+        &#8250;
+      </button>
+    </div>
+    <div
+      id="fieldsModal"
+      class="fixed inset-0 z-50 items-center justify-center flex hidden modal-backdrop"
+    >
+      <div
+        class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 w-full max-w-md m-4"
+      >
+        <h2 class="text-xl font-bold mb-4">Gestionar Campos del Mineral</h2>
+        <p class="text-sm text-gray-500 mb-4">
+          Añade o elimina campos para este mineral específico.
+        </p>
+        <div id="field-list" class="space-y-2 mb-4"></div>
+        <div class="flex gap-2">
+          <input
+            type="text"
+            id="newFieldName"
+            placeholder="Nombre del nuevo campo"
+            class="flex-grow bg-gray-50 dark:bg-gray-700 border-gray-300 rounded-md shadow-sm py-2 px-3"
+          /><button
+            id="addFieldBtn"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg"
+          >
+            Añadir
+          </button>
+        </div>
+        <div class="mt-6 flex justify-end space-x-4">
+          <button
+            id="closeFieldsModalBtn"
+            class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg"
+          >
+           Cerrar
+          </button>
+          <button
+            id="saveFieldsBtn"
+            class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg"
+          >
+            Guardar Cambios
+          </button>
+        </div>
+      </div>
+    </div>
+    <div
+      id="deleteConfirmModal"
+      class="fixed inset-0 z-50 items-center justify-center flex hidden modal-backdrop"
+    >
+      <div
+        class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 w-full max-w-md m-4"
+      >
+        <h2 class="text-xl font-bold mb-4">Confirmar Eliminación</h2>
+        <p>
+          ¿Estás seguro de que que quieres eliminar este mineral? Esta acción no se
+          puede deshacer.
+        </p>
+        <div class="mt-6 flex justify-end space-x-4">
+          <button
+            id="cancelDeleteBtn"
+            class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg"
+          >
+            Cancelar</button
+          ><button
+            id="confirmDeleteBtn"
+            class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg"
+          >
+            Eliminar
+          </button>
+        </div>
+      </div>
+    </div>
+    <div
+      id="shareModal"
+      class="fixed inset-0 z-50 items-center justify-center flex hidden modal-backdrop"
+    >
+      <div
+        class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 w-full max-w-lg m-4"
+      >
+        <h2 class="text-2xl font-bold mb-4">Compartir Catálogo</h2>
+        <p class="text-sm text-gray-500 mb-4">
+          Cualquier persona con este enlace o QR podrá ver tu catálogo en modo
+          de solo lectura.
+        </p>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium"
+              >Enlace para Compartir</label
+            ><input
+              id="share-url-input"
+              type="text"
+              readonly
+              class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 border-gray-300 rounded-md shadow-sm py-2 px-3"
+            />
+          </div>
+          <div class="text-center">
+            <div
+              id="share-qr-container"
+              class="inline-block p-2 bg-white rounded-md"
+            >
+              <canvas id="share-qr-canvas"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="mt-6 flex justify-end space-x-3">
+          <button
+            id="exportPdfBtn"
+            class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg"
+          >
+            Exportar a PDF
+          </button>
+          <button
+            id="closeShareBtn"
+            class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg"
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Modal de Progreso de PDF -->
+    <div id="pdf-progress-modal" class="fixed inset-0 z-[101] items-center justify-center flex hidden modal-backdrop">
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 w-full max-w-md m-4">
+        <h2 class="text-xl font-bold mb-4">Generando PDF</h2>
+        <p id="pdf-progress-text" class="text-sm text-gray-600 dark:text-gray-400 mb-2">Iniciando...</p>
+        <div class="w-full bg-gray-200 rounded-full h-4 dark:bg-gray-700">
+          <div id="pdf-progress-bar" class="bg-blue-600 h-4 rounded-full" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Modal de Descarga de PDF -->
+    <div id="pdf-download-modal" class="fixed inset-0 z-[101] items-center justify-center flex hidden modal-backdrop">
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 w-full max-w-md m-4 text-center">
+        <h2 class="text-xl font-bold mb-4">PDF Listo para Descargar</h2>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">Tu catálogo ha sido generado. Haz clic en el botón para iniciar la descarga.</p>
+        <a id="pdf-download-button" href="#" download="catalogo-minerales.pdf" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg inline-block">
+          Descargar PDF
+        </a>
+        <button id="pdf-download-close-button" class="mt-4 w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">
+          Cerrar
+        </button>
+      </div>
+    </div>
+
+
+    <div id="datalist-container"></div>
+    <div
+      id="notification-area"
+      class="fixed top-5 right-5 z-[100] space-y-2"
+    ></div>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("/sw.js")
+            .then((reg) => console.log("Service Worker registrado.", reg))
+            .catch((err) => console.log("Error en registro de SW:", err));
+        });
+      }
+    </script>
+
+    <script type="module">
+      // Firebase SDKs
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+      import {
+        getAuth,
+        onAuthStateChanged,
+        signOut,
+      } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+      import {
+        getFirestore,
+        collection,
+        onSnapshot,
+        doc,
+        getDoc,
+        deleteDoc,
+        setDoc,
+        query,
+        writeBatch,
+        updateDoc
+      } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+      import {
+        getStorage,
+        ref,
+        uploadBytes,
+        getDownloadURL,
+        deleteObject,
+      } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+      import { firebaseConfig } from "/firebase-config.js";
+      import { escapeHtml, safeColor, formatFormula, normalizeFormula } from "/utils.js";
+
+      let DOM = {};
+      let allMinerals = [],
+        firebaseUnsubscribe = null,
+        authUser = null;
+      let db, storage, auth, mineralsCollectionRef, publicMineralsCollectionRef;
+      let isOnline = navigator.onLine,
+        mineralToDeleteId = null,
+        currentMineralIdForFields = null;
+      let imagesToDeleteFromStorage = [],
+        lightboxState = { images: [], currentIndex: 0 };
+      let fieldSuggestions = {},
+        userShareToken = null;
+
+      const INFO_FIELD_NAME = "Info";
+      const DEFAULT_FIELDS = ["Color", "Dureza", "Lustre"];
+      
+      let draggedImage = null;
+      let touchDragState = {};
+
+      function logDebug(message, status = "info") {
+        const s = {
+          info: "text-gray-400",
+          success: "text-green-400",
+          error: "text-red-400",
+          warn: "text-yellow-400",
+        };
+        console[status === "error" ? "error" : "log"](message);
+        if (!DOM.debugLog) return;
+        const e = document.createElement("div");
+        e.className = `p-1 .debug-entry ${s[status] || "text-gray-400"}`;
+        e.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        DOM.debugLog.appendChild(e);
+        DOM.debugLog.scrollTop = DOM.debugLog.scrollHeight;
+      }
+      function showNotification(message, type = "success") {
+        const c = {
+          success: "bg-green-500",
+          error: "bg-red-500",
+          info: "bg-blue-500",
+        };
+        const n = document.createElement("div");
+        n.className = `notification text-white p-4 rounded-lg shadow-lg ${c[type]}`;
+        n.textContent = message;
+        DOM.notificationArea.appendChild(n);
+        setTimeout(() => n.remove(), 5000);
+      }
+      function updateSyncStatus(status, text) {
+        if (!DOM.syncText || !DOM.syncDot) return;
+        DOM.syncText.textContent = text;
+        DOM.syncDot.className = "w-3 h-3 rounded-full mr-2 ";
+        const c = {
+          online: "bg-green-500",
+          offline: "bg-gray-500",
+          syncing: "bg-blue-500",
+          error: "bg-red-500",
+          initializing: "bg-yellow-500",
+        };
+        DOM.syncDot.classList.add(c[status] || "bg-yellow-500");
+      }
+      function getImageUrl(image, size = 'md') {
+        const p = "https://placehold.co/600x400/cccccc/ffffff?text=Sin+Imagen";
+        
+        if (image.blobs && image.blobs[size]) {
+            try { return URL.createObjectURL(image.blobs[size]); } catch(e) {}
+        }
+
+        if (image.urls && image.urls[`url_${size}`]) {
+            return image.urls[`url_${size}`];
+        }
+        
+        // Fallback to any available URL or blob
+        if (image.urls) {
+            return image.urls.url_lg || image.urls.url_md || image.urls.url_sm;
+        }
+        if (image.blobs) {
+            try { return URL.createObjectURL(image.blobs.lg || image.blobs.md || image.blobs.sm); } catch(e) {}
+        }
+
+        return image.url || p; // For legacy data
+      }
+
+      const LocalDB = {
+        DB_NAME: "MineralCatalogDB",
+        DB_VERSION: 1,
+        db: null,
+        async open() {
+          if (this.db) return;
+          return new Promise((resolve, reject) => {
+            const r = indexedDB.open(this.DB_NAME, this.DB_VERSION);
+            r.onerror = () => reject("Error de IndexedDB");
+            r.onsuccess = (e) => {
+              this.db = e.target.result;
+              resolve();
+            };
+            r.onupgradeneeded = (e) => {
+              const db = e.target.result;
+              if (!db.objectStoreNames.contains("minerals"))
+                db.createObjectStore("minerals", { keyPath: "id" });
+              if (!db.objectStoreNames.contains("sync_queue"))
+                db.createObjectStore("sync_queue", { keyPath: "id" });
+            };
+          });
+        },
+        async transaction(store, mode, action) {
+          await this.open();
+          return new Promise((res, rej) => {
+            const tx = this.db.transaction(store, mode);
+            tx.oncomplete = () => res();
+            tx.onerror = () => rej("Error de transacción");
+            action(tx.objectStore(store));
+          });
+        },
+        async getAll(store) {
+          return new Promise(async (res) => {
+            await this.transaction(store, "readonly", (s) => {
+              const r = s.getAll();
+              r.onsuccess = () => res(r.result);
+            });
+          });
+        },
+        async get(store, id) {
+          return new Promise(async (res) => {
+            await this.transaction(store, "readonly", (s) => {
+              const r = s.get(id);
+              r.onsuccess = () => res(r.result);
+            });
+          });
+        },
+        async put(store, data) {
+          return this.transaction(store, "readwrite", (s) => s.put(data));
+        },
+        async delete(store, id) {
+          return this.transaction(store, "readwrite", (s) => s.delete(id));
+        },
+        async clear(store) {
+          return this.transaction(store, "readwrite", (s) => s.clear());
+        },
+      };
+
+      async function main() {
+        DOM = {
+          catalog: document.getElementById("mineral-catalog"),
+          loading: document.getElementById("loading-indicator"),
+          noResults: document.getElementById("no-results-message"),
+          addBtn: document.getElementById("addMineralBtn"),
+          modal: document.getElementById("mineralModal"),
+          form: document.getElementById("mineralForm"),
+          cancelBtn: document.getElementById("cancelBtn"),
+          submitBtn: document.getElementById("submitBtn"),
+          submitBtnText: document.getElementById("submitBtnText"),
+          submitBtnSpinner: document.getElementById("submitBtnSpinner"),
+          modalTitle: document.getElementById("modalTitle"),
+          searchInput: document.getElementById("searchInput"),
+          dynamicFiltersContainer: document.getElementById("dynamic-filters-container"),
+          filterFavorites: document.getElementById("filter-favorites"),
+          resetBtn: document.getElementById("resetFiltersBtn"),
+          importBtn: document.getElementById("importBtn"),
+          importFile: document.getElementById("importFile"),
+          exportBtn: document.getElementById("exportBtn"),
+          syncDot: document.getElementById("sync-status-dot"),
+          syncText: document.getElementById("sync-status-text"),
+          imageFilesInput: document.getElementById("imageFiles"),
+          deleteModal: document.getElementById("deleteConfirmModal"),
+          confirmDeleteBtn: document.getElementById("confirmDeleteBtn"),
+          cancelDeleteBtn: document.getElementById("cancelDeleteBtn"),
+          notificationArea: document.getElementById("notification-area"),
+          fieldsModal: document.getElementById("fieldsModal"),
+          fieldList: document.getElementById("field-list"),
+          newFieldName: document.getElementById("newFieldName"),
+          addFieldBtn: document.getElementById("addFieldBtn"),
+          saveFieldsBtn: document.getElementById("saveFieldsBtn"),
+          closeFieldsModalBtn: document.getElementById("closeFieldsModalBtn"),
+          manageFieldsBtnModal: document.getElementById("manage-fields-btn-modal"),
+          customFieldsFormContainer: document.getElementById("custom-fields-form-container"),
+          existingImagesContainer: document.getElementById("existing-images-container"),
+          tagsContainer: document.getElementById("tags-container"),
+          addTagBtn: document.getElementById("add-tag-btn"),
+          datalistContainer: document.getElementById("datalist-container"),
+          menuButton: document.getElementById("menu-button"),
+          menuDropdown: document.getElementById("menu-dropdown"),
+          authLink: document.getElementById("auth-link"),
+          shareCatalogBtn: document.getElementById("share-catalog-btn"),
+          shareModal: document.getElementById("shareModal"),
+          closeShareBtn: document.getElementById("closeShareBtn"),
+          exportPdfBtn: document.getElementById("exportPdfBtn"),
+          pdfProgressModal: document.getElementById('pdf-progress-modal'),
+          pdfProgressBar: document.getElementById('pdf-progress-bar'),
+          pdfProgressText: document.getElementById('pdf-progress-text'),
+          pdfDownloadModal: document.getElementById('pdf-download-modal'),
+          pdfDownloadButton: document.getElementById('pdf-download-button'),
+          pdfDownloadCloseButton: document.getElementById('pdf-download-close-button'),
+          lightbox: {
+            modal: document.getElementById("lightbox-modal"),
+            img: document.getElementById("lightbox-img"),
+            close: document.getElementById("lightbox-close"),
+            next: document.getElementById("lightbox-next"),
+            prev: document.getElementById("lightbox-prev"),
+          },
+        };
+        setupEventListeners();
+        setupLazyLoader();
+        updateSyncStatus("initializing", "Conectando...");
+        try {
+          await LocalDB.open();
+          await initializeFirebase();
+          setupAuthentication();
+        } catch (error) {
+          logDebug(`Error de inicialización: ${error.message}`, "error");
+          updateSyncStatus("error", `Error: ${error.message}`);
+        }
+      }
+
+      async function initializeFirebase() {
+        try {
+          const app = initializeApp(firebaseConfig);
+          auth = getAuth(app);
+          db = getFirestore(app);
+          storage = getStorage(app);
+          publicMineralsCollectionRef = collection(db, "public_minerals");
+        } catch (e) {
+          throw e;
+        }
+      }
+
+      function setupAuthentication() {
+        onAuthStateChanged(auth, handleUserSessionChange);
+      }
+
+      async function handleUserSessionChange(user) {
+        if (firebaseUnsubscribe) firebaseUnsubscribe();
+        authUser = user;
+        if (user) {
+          if (localStorage.getItem("lastUserId") !== user.uid) {
+            await LocalDB.clear("minerals");
+            await LocalDB.clear("sync_queue");
+          }
+          localStorage.setItem("lastUserId", user.uid);
+          mineralsCollectionRef = collection(db, `users/${user.uid}/minerals`);
+          DOM.authLink.textContent = "Cerrar Sesión";
+          DOM.authLink.href = "#";
+          DOM.authLink.onclick = (e) => {
+            e.preventDefault();
+            signOut(auth);
+          };
+          await loadLocalData();
+          activateUI(true);
+          await listenForFirebaseChanges();
+          await processPendingAction();
+          await processSyncQueue();
+          updateOnlineStatus();
+          window.addEventListener("online", updateOnlineStatus);
+          window.addEventListener("offline", updateOnlineStatus);
+        } else {
+          localStorage.removeItem("lastUserId");
+          window.location.href = `${window.location.origin}/login.html?redirect=${encodeURIComponent(window.location.href)}`;
+        }
+      }
+
+      async function processPendingAction() {
+        const params = new URLSearchParams(window.location.search);
+        const action = params.get("action"),
+          mineralId = params.get("mineralId");
+        if (action === "add" && mineralId) {
+          await addMineralFromPublic(mineralId);
+          window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname
+          );
+        }
+      }
+
+      async function addMineralFromPublic(mineralId) {
+        try {
+          const docRef = doc(publicMineralsCollectionRef, mineralId);
+          const docSnap = await getDoc(docRef);
+          if (!docSnap.exists())
+            return showNotification("El mineral público ya no existe.", "error");
+          const mineralToCopy = docSnap.data();
+          if (allMinerals.some((m) => m.name === mineralToCopy.name))
+            return showNotification(`'${mineralToCopy.name}' ya está en tu colección.`, "info");
+          
+          await saveMineral(
+            {
+              name: mineralToCopy.name,
+              formula: mineralToCopy.formula,
+              customData: mineralToCopy.customData || {},
+              tags: mineralToCopy.tags || [],
+              images: (mineralToCopy.images || []).map((i) => ({
+                urls: i.urls,
+                storagePaths: i.storagePaths,
+                placeholder: i.placeholder,
+                name: i.name,
+              })),
+            },
+            null
+          );
+          showNotification(`'${mineralToCopy.name}' añadido a tu colección.`, "success");
+        } catch (error) {
+          logDebug(`Error al añadir mineral: ${error.message}`, "error");
+          showNotification("No se pudo añadir el mineral.", "error");
+        }
+      }
+
+      function activateUI(isLoggedIn) {
+        DOM.addBtn.disabled = !isLoggedIn;
+        DOM.importBtn.disabled = !isLoggedIn;
+        DOM.exportBtn.disabled = !isLoggedIn;
+      }
+      async function updateOnlineStatus() {
+        isOnline = navigator.onLine;
+        if (isOnline) await processSyncQueue();
+        else updateSyncStatus("offline", "Sin conexión.");
+      }
+
+      async function processSyncQueue() {
+        if (!authUser) return;
+        const queue = await LocalDB.getAll("sync_queue");
+        if (queue.length === 0) {
+          if (isOnline) updateSyncStatus("online", "Sincronizado");
+          return;
+        }
+        logDebug(`Procesando ${queue.length} acciones en cola...`);
+        updateSyncStatus("syncing", `Sincronizando ${queue.length} cambios...`);
+
+        for (const action of queue) {
+          let opSuccess = false;
+          try {
+            const batch = writeBatch(db);
+            if (action.type === "delete") {
+              batch.delete(doc(mineralsCollectionRef, action.id));
+              batch.delete(doc(publicMineralsCollectionRef, action.id));
+              if (action.payload.storagePaths) {
+                for (const path of action.payload.storagePaths) {
+                  if (path)
+                    try {
+                      await deleteObject(ref(storage, path));
+                    } catch (e) {
+                      if (e.code !== "storage/object-not-found") throw e;
+                      logDebug(`Imagen ya eliminada: ${path}`, "warn");
+                    }
+                }
+              }
+            } else if (action.type === "save") {
+              const local = await LocalDB.get("minerals", action.id);
+              if (!local) {
+                await LocalDB.delete("sync_queue", action.id);
+                continue;
+              }
+              if (action.payload.imagesToDelete) {
+                for (const path of action.payload.imagesToDelete) {
+                  if (path)
+                    try {
+                      await deleteObject(ref(storage, path));
+                    } catch (e) {
+                      if (e.code !== "storage/object-not-found") throw e;
+                      logDebug(`Imagen ya eliminada: ${path}`, "warn");
+                    }
+                }
+              }
+              const finalImages = [];
+              for (const img of local.images || []) {
+                if (img.storagePaths && Object.keys(img.storagePaths).length > 0) {
+                    finalImages.push(img); // Already uploaded
+                } else if (img.blobs) {
+                    const imageId = crypto.randomUUID();
+                    const newImageEntry = { urls: {}, storagePaths: {}, placeholder: img.placeholder, name: img.name };
+                    for (const size in img.blobs) { // size is 'sm', 'md', 'lg'
+                        const storagePath = `users/${authUser.uid}/images/${local.id}-${imageId}_${size}.webp`;
+                        const storageRef = ref(storage, storagePath);
+                        const blob = await (await fetch(img.blobs[size])).blob(); // Ensure it's a real blob from base64
+                        await uploadBytes(storageRef, blob);
+                        const url = await getDownloadURL(storageRef);
+                        newImageEntry.urls[`url_${size}`] = url;
+                        newImageEntry.storagePaths[`path_${size}`] = storagePath;
+                    }
+                    finalImages.push(newImageEntry);
+                }
+              }
+              const payload = { ...local, images: finalImages.map(({ blobs, ...rest }) => rest), owner: authUser.uid };
+              delete payload.id;
+              batch.set(doc(mineralsCollectionRef, action.id), payload, { merge: true });
+              batch.set(doc(publicMineralsCollectionRef, action.id), payload, { merge: true });
+            }
+            await batch.commit();
+            opSuccess = true;
+          } catch (error) {
+            if (action.type === "delete" && (error.code === "permission-denied" || error.message.includes("insufficient permissions"))) {
+              logDebug(`Fallo al eliminar ${action.id}, probablemente ya eliminado.`, "warn");
+              opSuccess = true;
+            } else {
+              logDebug(`ERROR CRÍTICO para ${action.id}: ${error.message}`, "error");
+              updateSyncStatus("error", "Error de sincronización.");
+              return;
+            }
+          }
+          if (opSuccess) {
+            await LocalDB.delete("sync_queue", action.id);
+            logDebug(`Éxito para la acción ${action.id}.`, "success");
+          }
+        }
+        logDebug("Cola de sincronización procesada.", "success");
+        await applyFiltersAndSearch();
+        const remainingQueue = await LocalDB.getAll("sync_queue");
+        if (remainingQueue.length === 0 && isOnline) {
+          updateSyncStatus("online", "Sincronizado");
+        }
+      }
+
+      function listenForFirebaseChanges() {
+        return new Promise((resolve) => {
+          if (firebaseUnsubscribe) firebaseUnsubscribe();
+          if (!authUser) return resolve();
+          const q = query(mineralsCollectionRef);
+          let isFirstSnapshot = true;
+          firebaseUnsubscribe = onSnapshot(
+            q,
+            async (snapshot) => {
+              let needsRefresh = false;
+              for (const change of snapshot.docChanges()) {
+                if (change.doc.metadata.hasPendingWrites || (await LocalDB.get("sync_queue", change.doc.id)))
+                  continue;
+                needsRefresh = true;
+                if (change.type === "removed") {
+                  await LocalDB.delete("minerals", change.doc.id);
+                  await LocalDB.delete("sync_queue", change.doc.id);
+                } else {
+                  await LocalDB.put("minerals", { id: change.doc.id, ...change.doc.data() });
+                }
+              }
+              if (needsRefresh) {
+                logDebug("Refrescando UI tras cambios remotos.");
+                await loadLocalData();
+              }
+              if (isFirstSnapshot) {
+                isFirstSnapshot = false;
+                resolve();
+              }
+            },
+            (error) => logDebug(`Error de Snapshot: ${error.message}`, "error")
+          );
+        });
+      }
+
+      function compileFieldSuggestions() {
+        fieldSuggestions = {};
+        for (const mineral of allMinerals) {
+          if (!mineral.customData) continue;
+          for (const [field, values] of Object.entries(mineral.customData)) {
+            if (!fieldSuggestions[field]) fieldSuggestions[field] = new Set();
+            if (Array.isArray(values)) {
+              for (const value of values) fieldSuggestions[field].add(value);
+            }
+          }
+        }
+      }
+
+      async function loadLocalData() {
+        logDebug("Cargando datos locales...");
+        try {
+          const minerals = await LocalDB.getAll("minerals");
+          allMinerals = (
+            await Promise.all(
+              minerals.map(async (m) => ({
+                ...m,
+                images: await Promise.all(
+                  (m.images || []).map(async (img) => {
+                      if (!img.blobs || img.blobs.lg instanceof Blob) return img; // No blobs to convert or already converted
+                      // Convert from base64
+                      const blobs = {
+                          lg: await (await fetch(img.blobs.lg)).blob(),
+                          md: await (await fetch(img.blobs.md)).blob(),
+                          sm: await (await fetch(img.blobs.sm)).blob(),
+                      };
+                      return { ...img, blobs };
+                  })
+                ),
+              }))
+            )
+          ).sort((a, b) => a.name.localeCompare(b.name));
+          compileFieldSuggestions();
+          populateFilterOptions();
+          await applyFiltersAndSearch();
+        } catch (e) {
+          logDebug(`Error al cargar datos: ${e.message}`, "error");
+        }
+        DOM.loading.style.display = "none";
+      }
+      
+      async function toggleFavorite(mineralId) {
+        const mineral = allMinerals.find(m => m.id === mineralId);
+        if (!mineral) return;
+
+        mineral.isFavorite = !mineral.isFavorite;
+        
+        await LocalDB.put("minerals", mineral);
+        await LocalDB.put("sync_queue", { type: "save", id: mineralId, payload: {} });
+
+        const card = document.querySelector(`[data-mineral-id='${mineralId}']`);
+        if (card) {
+           const favIcon = card.querySelector('.favorite-btn svg');
+           favIcon.classList.toggle('text-yellow-400', mineral.isFavorite);
+           favIcon.classList.toggle('text-gray-400', !mineral.isFavorite);
+        }
+        
+        if (isOnline) processSyncQueue();
+        showNotification(mineral.isFavorite ? `'${mineral.name}' añadido a favoritos.` : `'${mineral.name}' quitado de favoritos.`, 'info');
+      }
+
+      async function saveMineral(
+        mineralData,
+        newFiles,
+        imagesToDeletePaths = []
+      ) {
+        DOM.submitBtn.disabled = true;
+        DOM.submitBtnText.textContent = "Guardando...";
+        DOM.submitBtnSpinner.classList.remove("hidden");
+        
+        const isEditing = !!mineralData.id;
+        const id = isEditing ? mineralData.id : crypto.randomUUID();
+        let finalImages = mineralData.images || [];
+
+        if (newFiles?.length) {
+            showNotification(`Procesando ${newFiles.length} imágenes...`, 'info');
+            for (const file of newFiles) {
+                const imageSet = await createImageSet(file);
+                finalImages.push({
+                    blobs: { lg: imageSet.lg, md: imageSet.md, sm: imageSet.sm },
+                    placeholder: imageSet.placeholder,
+                    urls: {}, storagePaths: {}, name: imageSet.name
+                });
+            }
+            showNotification('Imágenes procesadas y listas para guardar.', 'success');
+        }
+
+        const mineral = {
+          ...mineralData,
+          id,
+          images: finalImages,
+          updatedAt: new Date().toISOString(),
+        };
+
+        const blobToBase64 = (blob) => new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+        });
+
+        const storable = {
+          ...mineral,
+          images: await Promise.all(
+            mineral.images.map(async (img) => {
+              if (!img.blobs) return img;
+              const { blobs, ...rest } = img;
+              const blobs_b64 = {
+                  lg: await blobToBase64(blobs.lg),
+                  md: await blobToBase64(blobs.md),
+                  sm: await blobToBase64(blobs.sm),
+              };
+              return { ...rest, blobs: blobs_b64 };
+            })
+          ),
+        };
+        await LocalDB.put("minerals", storable);
+        await loadLocalData();
+        showNotification(`Mineral '${mineral.name}' ${isEditing ? "actualizado" : "guardado"}.`, "success");
+        if (authUser) {
+          await LocalDB.put("sync_queue", {
+            type: "save",
+            id,
+            payload: { imagesToDelete: imagesToDeletePaths },
+          });
+          if (isOnline) processSyncQueue();
+        }
+        
+        DOM.submitBtn.disabled = false;
+        DOM.submitBtnText.textContent = "Guardar";
+        DOM.submitBtnSpinner.classList.add("hidden");
+      }
+
+      async function deleteMineralFromDB(id) {
+        const mineral = await LocalDB.get("minerals", id);
+        if (!mineral) return;
+        await LocalDB.delete("minerals", id);
+        await loadLocalData();
+        showNotification(`'${mineral.name}' eliminado.`, "info");
+        if (authUser) {
+          const paths = (mineral.images || []).flatMap(i => i.storagePaths ? Object.values(i.storagePaths) : []).filter(Boolean);
+          await LocalDB.put("sync_queue", {
+            type: "delete",
+            id,
+            payload: { storagePaths: paths },
+          });
+          if (isOnline) processSyncQueue();
+        }
+      }
+
+      function setupEventListeners() {
+        DOM.addBtn.addEventListener("click", () => openModal("add"));
+        DOM.cancelBtn.addEventListener("click", closeModal);
+        DOM.modal.addEventListener(
+          "click",
+          (e) => e.target === DOM.modal && closeModal()
+        );
+        DOM.form.addEventListener("submit", handleFormSubmit);
+        DOM.resetBtn.addEventListener("click", resetFilters);
+        DOM.importBtn.addEventListener("click", () => DOM.importFile.click());
+        DOM.importFile.addEventListener("change", handleImport);
+        DOM.exportBtn.addEventListener("click", handleExport);
+        DOM.cancelDeleteBtn.addEventListener("click", closeDeleteModal);
+        DOM.deleteModal.addEventListener(
+          "click",
+          (e) => e.target === DOM.deleteModal && closeDeleteModal()
+        );
+        DOM.confirmDeleteBtn.addEventListener("click", () => {
+          if (mineralToDeleteId) deleteMineralFromDB(mineralToDeleteId);
+          closeDeleteModal();
+        });
+        DOM.authLink.onclick = (e) => {
+          e.preventDefault();
+          if (authUser) signOut(auth);
+        };
+        DOM.menuButton.addEventListener("click", () =>
+          DOM.menuDropdown.classList.toggle("hidden")
+        );
+        DOM.shareCatalogBtn.addEventListener("click", generateAndShowShareLink);
+        DOM.closeShareBtn.addEventListener("click", () =>
+          DOM.shareModal.classList.add("hidden")
+        );
+        DOM.exportPdfBtn.addEventListener('click', handleExportToPdf);
+        DOM.addTagBtn.addEventListener('click', handleAddTag);
+        DOM.manageFieldsBtnModal.addEventListener('click', () => openFieldsModal(currentMineralIdForFields));
+        DOM.closeFieldsModalBtn.addEventListener('click', closeFieldsModal);
+        DOM.addFieldBtn.addEventListener("click", handleAddField);
+        DOM.saveFieldsBtn.addEventListener("click", handleSaveFields);
+        DOM.lightbox.close.addEventListener("click", closeLightbox);
+        DOM.filterFavorites.addEventListener("change", applyFiltersAndSearch);
+        DOM.lightbox.next.addEventListener("click", () =>
+          showLightboxImage(lightboxState.currentIndex + 1)
+        );
+        DOM.lightbox.prev.addEventListener("click", () =>
+          showLightboxImage(lightboxState.currentIndex - 1)
+        );
+        document.addEventListener("keydown", (e) => {
+          if (DOM.lightbox.modal.classList.contains("flex")) {
+            if (e.key === "Escape") closeLightbox();
+            if (e.key === "ArrowRight")
+              showLightboxImage(lightboxState.currentIndex + 1);
+            if (e.key === "ArrowLeft")
+              showLightboxImage(lightboxState.currentIndex - 1);
+          }
+        });
+      }
+
+      function openModal(mode, mineral = {}) {
+        DOM.form.reset();
+        DOM.existingImagesContainer.innerHTML = "";
+        DOM.customFieldsFormContainer.innerHTML = "";
+        DOM.datalistContainer.innerHTML = "";
+        DOM.tagsContainer.innerHTML = "";
+        imagesToDeleteFromStorage = [];
+        currentMineralIdForFields = mineral.id || null;
+        
+        DOM.modalTitle.textContent =
+          mode === "edit" ? "Editar Mineral" : "Añadir Mineral";
+        DOM.form.querySelector("#mineralId").value = mineral.id || "";
+        DOM.form.querySelector("#name").value = mineral.name || "";
+        DOM.form.querySelector("#formula").value = mineral.formula || "";
+
+        (mineral.tags || []).forEach(tag => renderTag(tag.name, tag.color));
+        
+        if (mode === "edit" && mineral.images?.length) {
+          mineral.images.forEach((img, i) => renderDraggableImage(img, i));
+        } else {
+          DOM.existingImagesContainer.innerHTML =
+            '<p class="text-sm text-gray-400 col-span-3">No hay imágenes. La primera que añadas será la principal.</p>';
+        }
+
+        for (const [field, suggestions] of Object.entries(fieldSuggestions)) {
+          const datalist = document.createElement("datalist");
+          datalist.id = `datalist-${field.replace(/\s+/g, "-")}`;
+          for (const value of suggestions) {
+            const option = document.createElement("option");
+            option.value = value;
+            datalist.appendChild(option);
+          }
+          DOM.datalistContainer.appendChild(datalist);
+        }
+
+        const allFields =
+          mode === "edit"
+            ? Object.keys(mineral.customData || {})
+            : [...DEFAULT_FIELDS, INFO_FIELD_NAME];
+        const sortedFields = [...new Set(allFields)]
+          .filter((f) => f !== INFO_FIELD_NAME)
+          .sort((a, b) => a.localeCompare(b));
+
+        const infoValue =
+          mineral.customData?.[INFO_FIELD_NAME]?.join(" ") || "";
+        DOM.customFieldsFormContainer.insertAdjacentHTML(
+          "beforeend",
+          `<div><label for="custom-field-info" class="block text-sm font-medium">${escapeHtml(INFO_FIELD_NAME)}</label><textarea data-field-name="${escapeHtml(INFO_FIELD_NAME)}" class="custom-field-textarea mt-1 block w-full bg-gray-50 dark:bg-gray-700 rounded-md shadow-sm py-2 px-3" rows="3">${escapeHtml(infoValue)}</textarea></div>`
+        );
+
+        sortedFields.forEach((field) => {
+          const values = mineral.customData?.[field] || [""];
+          const fieldId = `field-container-${field.replace(/\s+/g, "-")}`;
+          const datalistId = `datalist-${field.replace(/\s+/g, "-")}`;
+          let inputsHtml = (values.length ? values : [""])
+            .map(
+              (value) =>
+                `<input type="text" value="${escapeHtml(value)}" list="${escapeHtml(datalistId)}" autocomplete="off" class="custom-field-input mt-1 block w-full bg-gray-50 dark:bg-gray-700 rounded-md shadow-sm py-2 px-3">`
+            )
+            .join("");
+          DOM.customFieldsFormContainer.insertAdjacentHTML(
+            "beforeend",
+            `<div><label class="block text-sm font-medium">${escapeHtml(field)}</label><div id="${fieldId}" data-field-name="${escapeHtml(field)}" class="custom-field-inputs-container space-y-2">${inputsHtml}</div></div>`
+          );
+        });
+
+        DOM.customFieldsFormContainer
+          .querySelectorAll(".custom-field-inputs-container")
+          .forEach((c) =>
+            c.addEventListener("input", (e) => {
+              if (
+                e.target.tagName === "INPUT" &&
+                e.target === c.lastElementChild &&
+                e.target.value.trim() !== ""
+              ) {
+                const i = document.createElement("input");
+                i.type = "text";
+                i.className = e.target.className;
+                i.setAttribute("list", e.target.getAttribute("list"));
+                i.setAttribute("autocomplete", "off");
+                c.appendChild(i);
+              }
+            })
+          );
+        DOM.modal.classList.remove("hidden");
+        DOM.modal.classList.add("flex");
+      }
+      function closeModal() {
+        DOM.modal.classList.add("hidden");
+      }
+      function openDeleteModal(id) {
+        mineralToDeleteId = id;
+        DOM.deleteModal.classList.remove("hidden");
+        DOM.deleteModal.classList.add("flex");
+      }
+      function closeDeleteModal() {
+        mineralToDeleteId = null;
+        DOM.deleteModal.classList.add("hidden");
+      }
+
+      async function handleFormSubmit(e) {
+        e.preventDefault();
+        const id = DOM.form.querySelector("#mineralId").value;
+        const mineralData = {
+          id,
+          name: DOM.form.querySelector("#name").value,
+          formula: DOM.form.querySelector("#formula").value,
+          customData: {},
+          isFavorite: id ? allMinerals.find(m => m.id === id)?.isFavorite || false : false,
+          tags: Array.from(DOM.tagsContainer.querySelectorAll('.tag-item')).map(tagEl => ({
+              name: tagEl.dataset.name,
+              color: tagEl.dataset.color
+          }))
+        };
+        
+        const info = DOM.form.querySelector(`[data-field-name="${INFO_FIELD_NAME}"]`).value.trim();
+        if (info) mineralData.customData[INFO_FIELD_NAME] = [info];
+
+        DOM.form
+          .querySelectorAll(".custom-field-inputs-container")
+          .forEach((container) => {
+            const fieldName = container.dataset.fieldName;
+            const values = Array.from(container.querySelectorAll("input"))
+              .map((input) => input.value.trim())
+              .filter(Boolean);
+            if (values.length) mineralData.customData[fieldName] = values;
+          });
+
+        const newFiles = DOM.form.querySelector("#imageFiles").files;
+        
+        const orderedImageElements = Array.from(DOM.existingImagesContainer.querySelectorAll('.image-draggable'));
+        const originalMineral = allMinerals.find(m => m.id === id);
+        const originalImages = originalMineral ? originalMineral.images : [];
+        
+        const keptImages = orderedImageElements.map(el => {
+            const originalIndex = parseInt(el.dataset.imageIndex, 10);
+            return originalImages[originalIndex];
+        }).filter(Boolean);
+        
+        mineralData.images = keptImages;
+        
+        await saveMineral(mineralData, newFiles, imagesToDeleteFromStorage);
+        closeModal();
+      }
+
+      function openLightbox(images, startIndex) {
+        lightboxState = { images, currentIndex: startIndex };
+        DOM.lightbox.modal.classList.remove("hidden");
+        DOM.lightbox.modal.classList.add("flex");
+        showLightboxImage(startIndex);
+      }
+      function closeLightbox() {
+        DOM.lightbox.modal.classList.add("hidden");
+        DOM.lightbox.modal.classList.remove("flex");
+        DOM.lightbox.img.src = "";
+      }
+      function showLightboxImage(index) {
+        const { images } = lightboxState;
+        if (index < 0 || index >= images.length) return;
+        lightboxState.currentIndex = index;
+        DOM.lightbox.img.src = getImageUrl(images[index], 'lg');
+        DOM.lightbox.prev.style.display = index > 0 ? "block" : "none";
+        DOM.lightbox.next.style.display =
+          index < images.length - 1 ? "block" : "none";
+      }
+
+      function openFieldsModal(mineralId) {
+        currentMineralIdForFields = mineralId;
+        const mineral = allMinerals.find((m) => m.id === mineralId);
+        const fields = mineral?.customData
+          ? Object.keys(mineral.customData)
+              .filter((k) => k !== INFO_FIELD_NAME)
+              .sort((a, b) => a.localeCompare(b))
+          : [...DEFAULT_FIELDS].sort((a, b) => a.localeCompare(b));
+        renderFieldList(fields);
+        DOM.fieldsModal.classList.remove("hidden");
+        DOM.fieldsModal.classList.add("flex");
+      }
+      function closeFieldsModal() {
+        DOM.fieldsModal.classList.add("hidden");
+        // No reseteamos currentMineralIdForFields porque el modal principal sigue abierto
+      }
+      function renderFieldList(fields) {
+        DOM.fieldList.innerHTML = "";
+        fields.forEach((f) => {
+          const el = document.createElement("div");
+          el.className =
+            "flex items-center justify-between bg-gray-100 dark:bg-gray-700 p-2 rounded";
+          el.innerHTML = `<span>${escapeHtml(f)}</span><button data-field-name="${escapeHtml(f)}" class="remove-field-btn text-red-500 hover:text-red-700">✖</button>`;
+          DOM.fieldList.appendChild(el);
+        });
+        document
+          .querySelectorAll(".remove-field-btn")
+          .forEach((btn) => btn.addEventListener("click", handleRemoveField));
+      }
+      function handleAddField() {
+        const name = DOM.newFieldName.value.trim();
+        if (name && name !== INFO_FIELD_NAME) {
+          const el = document.createElement("div");
+          el.className =
+            "flex items-center justify-between bg-gray-100 dark:bg-gray-700 p-2 rounded";
+          el.innerHTML = `<span>${escapeHtml(name)}</span><button data-field-name="${escapeHtml(name)}" class="remove-field-btn text-red-500 hover:text-red-700">✖</button>`;
+          el.querySelector(".remove-field-btn").addEventListener(
+            "click",
+            handleRemoveField
+          );
+          DOM.fieldList.appendChild(el);
+          DOM.newFieldName.value = "";
+        }
+      }
+      function handleRemoveField(e) {
+        e.target.parentElement.remove();
+      }
+      async function handleSaveFields() {
+        const mineral = allMinerals.find(
+          (m) => m.id === currentMineralIdForFields
+        );
+        if (!mineral) return;
+        const newFields = Array.from(
+          DOM.fieldList.querySelectorAll("span")
+        ).map((s) => s.textContent);
+        const newCustomData = {
+          [INFO_FIELD_NAME]: mineral.customData?.[INFO_FIELD_NAME] || [],
+        };
+        newFields.forEach((f) => {
+          newCustomData[f] = mineral.customData?.[f] || [];
+        });
+        mineral.customData = newCustomData;
+
+        // Recargamos el formulario de campos personalizados en el modal principal
+        DOM.customFieldsFormContainer.innerHTML = '';
+        const infoValue = newCustomData?.[INFO_FIELD_NAME]?.join(" ") || "";
+        DOM.customFieldsFormContainer.insertAdjacentHTML("beforeend", `<div><label for="custom-field-info" class="block text-sm font-medium">${escapeHtml(INFO_FIELD_NAME)}</label><textarea data-field-name="${escapeHtml(INFO_FIELD_NAME)}" class="custom-field-textarea mt-1 block w-full bg-gray-50 dark:bg-gray-700 rounded-md shadow-sm py-2 px-3" rows="3">${escapeHtml(infoValue)}</textarea></div>`);
+
+        newFields.forEach((field) => {
+            const values = newCustomData?.[field] || [""];
+            const fieldId = `field-container-${field.replace(/\s+/g, "-")}`;
+            const datalistId = `datalist-${field.replace(/\s+/g, "-")}`;
+            let inputsHtml = (values.length ? values : [""]).map(value => `<input type="text" value="${escapeHtml(value)}" list="${escapeHtml(datalistId)}" autocomplete="off" class="custom-field-input mt-1 block w-full bg-gray-50 dark:bg-gray-700 rounded-md shadow-sm py-2 px-3">`).join("");
+            DOM.customFieldsFormContainer.insertAdjacentHTML("beforeend", `<div><label class="block text-sm font-medium">${escapeHtml(field)}</label><div id="${fieldId}" data-field-name="${escapeHtml(field)}" class="custom-field-inputs-container space-y-2">${inputsHtml}</div></div>`);
+        });
+
+        showNotification("La lista de campos ha sido actualizada. Guarda el mineral para confirmar los cambios.", "info");
+        closeFieldsModal();
+      }
+
+      async function generateAndShowShareLink() {
+        if (!authUser) return;
+        if (!userShareToken) {
+            userShareToken = authUser.uid; // Usar el UID como token único
+            const shareTokenRef = doc(db, "share_links", userShareToken);
+            try {
+                await setDoc(shareTokenRef, {
+                    userId: authUser.uid,
+                    createdAt: new Date(),
+                });
+                showNotification("Enlace para compartir generado.", "success");
+            } catch (e) {
+                showNotification("No se pudo generar el enlace.", "error");
+                return;
+            }
+        }
+
+        const url = `${window.location.origin}/share.html?token=${userShareToken}`;
+        document.getElementById("share-url-input").value = url;
+        const canvas = document.getElementById("share-qr-canvas");
+        QRCode.toCanvas(canvas, url, { width: 256, errorCorrectionLevel: 'H' }, function (error) {
+            if (error) console.error("Error al generar QR:", error);
+        });
+        DOM.shareModal.classList.remove("hidden");
+        DOM.menuDropdown.classList.add("hidden");
+    }
+
+    function generateQrForCard(mineral, canvas) {
+      if (canvas.dataset.qrGenerated === 'true' || !authUser) return;
+      const payload = { name: mineral.name, formula: mineral.formula, customData: mineral.customData || {} };
+      const data = encodeURIComponent(JSON.stringify(payload));
+      let url = `${window.location.origin}/ficha.html?id=${mineral.id}&data=${data}`;
+      if (url.length > 2048) url = `${window.location.origin}/ficha.html?id=${mineral.id}`;
+
+      QRCode.toCanvas(canvas, url, { width: 220, errorCorrectionLevel: 'L' }, function (error) {
+          if (error) console.error('Error al generar QR de la tarjeta:', error);
+          else canvas.dataset.qrGenerated = 'true';
+      });
+  }
+    
+    async function applyFiltersAndSearch() {
+        const queue = await LocalDB.getAll("sync_queue");
+        const pendingIds = new Set(queue.map((i) => i.id));
+        const term = DOM.searchInput.value.toLowerCase();
+        const showFavorites = DOM.filterFavorites.checked;
+
+        const filters = {};
+        document.querySelectorAll(".dynamic-filter").forEach((s) => {
+          if (s.value) filters[s.dataset.fieldName] = s.value;
+        });
+
+        const selectedTag = document.querySelector("#filter-by-tag")?.value;
+
+        const filtered = allMinerals.filter(m => {
+          const nameMatch = m.name.toLowerCase().includes(term);
+          const favoriteMatch = !showFavorites || m.isFavorite;
+          const customFieldsMatch = Object.entries(filters).every(
+              ([f, v]) => m.customData && Array.isArray(m.customData[f]) && m.customData[f].includes(v)
+            );
+          const tagMatch = !selectedTag || (m.tags && m.tags.some(tag => tag.name === selectedTag));
+
+          return nameMatch && favoriteMatch && customFieldsMatch && tagMatch;
+        });
+        
+        renderCatalog(filtered, pendingIds);
+      }
+
+      function resetFilters() {
+        DOM.searchInput.value = "";
+        DOM.filterFavorites.checked = false;
+        document.querySelectorAll(".dynamic-filter, #filter-by-tag").forEach((s) => (s.value = ""));
+        applyFiltersAndSearch();
+      }
+      function renderCatalog(minerals, pendingIds = new Set()) {
+        if(window.lazyImages) {
+            window.lazyImages.forEach(img => window.lazyLoadObserver.unobserve(img));
+            window.lazyImages.clear();
+        }
+        DOM.catalog.innerHTML = "";
+        DOM.noResults.classList.toggle("hidden", minerals.length > 0);
+        minerals.forEach((m, index) => {
+            const card = createMineralCard(m, pendingIds, index);
+            DOM.catalog.appendChild(card);
+            card.querySelectorAll('.lazy-image').forEach(img => {
+                window.lazyImages.add(img);
+                window.lazyLoadObserver.observe(img);
+            });
+        });
+      }
+      
+      function getDisplayImage(image) {
+        const placeholder = image.placeholder || "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"; // transparent pixel
+        
+        if (image.blobs) {
+            return {
+                src: image.placeholder,
+                srcset: `${URL.createObjectURL(image.blobs.sm)} 400w, ${URL.createObjectURL(image.blobs.md)} 800w, ${URL.createObjectURL(image.blobs.lg)} 1280w`
+            };
+        }
+        
+        if (image.urls && image.urls.url_lg) {
+            return {
+                src: image.placeholder,
+                srcset: `${image.urls.url_sm} 400w, ${image.urls.url_md} 800w, ${image.urls.url_lg} 1280w`
+            };
+        }
+
+        const singleUrl = image.url || placeholder;
+        return { src: singleUrl, srcset: '' };
+      }
+
+      function createMineralCard(mineral, pendingIds = new Set(), index = 0) {
+        const card = document.createElement("div");
+        card.className = "bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden card-enter";
+        card.dataset.mineralId = mineral.id;
+
+        const isPending = pendingIds.has(mineral.id);
+        const firstImg = mineral.images?.length ? mineral.images[0] : null;
+        const displayImg = firstImg ? getDisplayImage(firstImg) : { src: "https://placehold.co/600x400?text=Sin+Imagen", srcset: '' };
+        
+        const isAboveTheFold = index < 4; // Prioritize first 4 images
+
+        const safeName = escapeHtml(mineral.name);
+        const imagesHtml = mineral.images?.length
+          ? mineral.images
+              .map(
+                (img, i) => {
+                  const displayData = getDisplayImage(img);
+                  return `<img src="${escapeHtml(displayData.src)}" data-srcset="${escapeHtml(displayData.srcset)}" alt="${safeName}" class="lazy-image w-full h-40 object-cover rounded-md mb-2 cursor-pointer gallery-img" data-index="${i}" crossorigin="anonymous">`;
+                }
+              )
+              .join("")
+          : '<p class="text-sm text-gray-400">No hay imágenes.</p>';
+
+        const tagsHtml = (mineral.tags || []).map(tag =>
+            `<span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-white last:mr-0 mr-1" style="background-color: ${safeColor(tag.color)};">${escapeHtml(tag.name)}</span>`
+        ).join(' ');
+
+        const infoText = mineral.customData?.[INFO_FIELD_NAME]?.join(" ") || "";
+        const otherDetails = mineral.customData
+          ? Object.keys(mineral.customData)
+              .filter((k) => k !== INFO_FIELD_NAME)
+              .sort((a, b) => a.localeCompare(b))
+              .map((k) => {
+                const v = mineral.customData[k];
+                return Array.isArray(v) && v.length
+                  ? `<p class="text-sm"><strong>${escapeHtml(k)}:</strong> ${escapeHtml(v.join( ", " ))}</p>`
+                  : "";
+              })
+              .join("")
+          : "";
+        const qrHtml = isPending
+          ? `<div class="text-center p-4 bg-yellow-100 rounded-lg"><p class="text-sm text-yellow-800">QR no disponible mientras se sincroniza.</p></div>`
+          : `<div class="flex flex-col items-center gap-2 bg-gray-100 dark:bg-gray-700 p-2 rounded-lg"><canvas class="qr-canvas-card"></canvas><button class="export-qr-btn text-sm bg-gray-600 hover:bg-gray-700 text-white font-bold py-1 px-3 rounded-lg">Exportar QR</button></div>`;
+        const pendingHtml = isPending
+          ? `<span class="ml-2 text-xs font-semibold py-1 px-2 uppercase rounded-full text-blue-600 bg-blue-200">Sincronizando...</span>`
+          : "";
+        const favoriteIconColor = mineral.isFavorite ? "text-yellow-400" : "text-gray-400";
+
+        card.innerHTML = `<div class="relative cursor-pointer expand-toggle"><img src="${escapeHtml(displayImg.src)}" data-srcset="${escapeHtml(displayImg.srcset)}" alt="${safeName}" class="lazy-image w-full h-48 object-cover" crossorigin="anonymous" ${isAboveTheFold ? 'fetchpriority="high"' : 'loading="lazy"'}>
+        <div class="absolute top-2 right-2 bg-black/50 p-2 rounded-full"><svg class="w-4 h-4 text-white arrow-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></div></div><div class="p-4"><div class="flex justify-between items-start"><div class="flex-grow"><h3 class="text-xl font-bold">${safeName}${pendingHtml}</h3><p class="text-sm text-gray-500 font-mono truncate">${formatFormula(mineral.formula)}</p></div><button class="favorite-btn p-1 -mt-1 -mr-1"><svg class="w-6 h-6 ${favoriteIconColor} hover:text-yellow-300" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg></button></div><div class="mt-2">${tagsHtml}</div></div><div class="mineral-details px-4"><div class="border-t pt-4"><h4 class="font-bold mb-2">Detalles:</h4><p class="text-sm text-gray-600 dark:text-gray-400 italic mb-2">${escapeHtml(infoText)}</p><div class="space-y-1">${otherDetails}</div><h4 class="font-bold mt-4 mb-2">Galería:</h4><div class="grid grid-cols-2 gap-2">${imagesHtml}</div><h4 class="font-bold mt-4 mb-2">Código QR:</h4>${qrHtml}</div></div><div class="p-2 bg-gray-50 dark:bg-gray-700/50 flex justify-end space-x-3"><button class="edit-btn text-blue-500 hover:text-blue-400 font-semibold text-sm p-2">Editar</button><button class="delete-btn text-red-500 hover:text-red-400 font-semibold text-sm p-2">Eliminar</button></div>`;
+
+        const qrCanvas = card.querySelector(".qr-canvas-card");
+        card.querySelector(".expand-toggle").addEventListener("click", () => {
+          card.classList.toggle("is-expanded");
+          if (
+            card.classList.contains("is-expanded") &&
+            authUser &&
+            !isPending &&
+            qrCanvas
+          )
+            generateQrForCard(mineral, qrCanvas);
+        });
+        card.querySelectorAll(".gallery-img").forEach((img) =>
+          img.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openLightbox(
+              mineral.images,
+              parseInt(e.currentTarget.dataset.index)
+            );
+          })
+        );
+        const exportBtn = card.querySelector(".export-qr-btn");
+        if (exportBtn) {
+          exportBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const canvas = card.querySelector(".qr-canvas-card");
+            generateQrForCard(mineral, canvas);
+            setTimeout(() => {
+              const link = document.createElement("a");
+              link.href = canvas.toDataURL("image/png");
+              link.download = `${mineral.name
+                .replace(/[^a-z0-9]/gi, "_")
+                .toLowerCase()}_qr.png`;
+              link.click();
+              showNotification("QR exportado.", "success");
+            }, 100);
+          });
+        }
+        card.querySelector('.favorite-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleFavorite(mineral.id);
+        });
+        card.querySelector(".edit-btn").addEventListener("click", (e) => {
+          e.stopPropagation();
+          openModal("edit", mineral);
+        });
+        card.querySelector(".delete-btn").addEventListener("click", (e) => {
+          e.stopPropagation();
+          openDeleteModal(mineral.id);
+        });
+        return card;
+      }
+      
+      // Funciones para Drag & Drop de imágenes (incluye soporte táctil)
+      function renderDraggableImage(img, index) {
+        const container = document.createElement("div");
+        container.className = "relative group image-draggable";
+        container.dataset.imageIndex = index;
+        container.dataset.storagePath = img.storagePaths ? Object.values(img.storagePaths).join(',') : "";
+        container.draggable = true;
+
+        container.innerHTML = `<img src="${getImageUrl(img, 'sm')}" class="w-full h-24 object-cover rounded-md pointer-events-none" crossorigin="anonymous"><button type="button" class="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity delete-img-btn"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>`;
+        DOM.existingImagesContainer.appendChild(container);
+
+        container.querySelector('.delete-img-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const c = e.currentTarget.parentElement;
+            if (c.dataset.storagePath) {
+                imagesToDeleteFromStorage.push(...c.dataset.storagePath.split(','));
+            }
+            c.remove();
+        });
+
+        // Eventos para Desktop (Mouse)
+        container.addEventListener('dragstart', (e) => {
+            draggedImage = e.target;
+            setTimeout(() => e.target.classList.add('dragging'), 0);
+        });
+        container.addEventListener('dragend', (e) => {
+            e.target.classList.remove('dragging');
+        });
+        container.addEventListener('dragover', (e) => e.preventDefault());
+        container.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (e.target.classList.contains('image-draggable') && e.target !== draggedImage) {
+                 const rect = e.target.getBoundingClientRect();
+                 const offsetX = e.clientX - rect.left;
+                 if (offsetX > rect.width / 2) {
+                     e.target.parentNode.insertBefore(draggedImage, e.target.nextSibling);
+                 } else {
+                     e.target.parentNode.insertBefore(draggedImage, e.target);
+                 }
+            }
+        });
+
+        // Eventos para Móvil (Táctil)
+        container.addEventListener('touchstart', (e) => {
+            touchDragState.isDragging = true;
+            touchDragState.draggedEl = e.currentTarget;
+            touchDragState.draggedEl.classList.add('dragging');
+            
+            const rect = touchDragState.draggedEl.getBoundingClientRect();
+            touchDragState.ghostEl = touchDragState.draggedEl.cloneNode(true);
+            touchDragState.ghostEl.classList.add('touch-drag-ghost');
+            document.body.appendChild(touchDragState.ghostEl);
+            
+            touchDragState.offsetX = e.touches[0].clientX - rect.left;
+            touchDragState.offsetY = e.touches[0].clientY - rect.top;
+
+            touchDragState.ghostEl.style.width = `${rect.width}px`;
+            touchDragState.ghostEl.style.height = `${rect.height}px`;
+            touchDragState.ghostEl.style.left = `${e.touches[0].clientX - touchDragState.offsetX}px`;
+            touchDragState.ghostEl.style.top = `${e.touches[0].clientY - touchDragState.offsetY}px`;
+        });
+        
+        container.addEventListener('touchmove', (e) => {
+            if (!touchDragState.isDragging) return;
+            e.preventDefault();
+            
+            touchDragState.ghostEl.style.left = `${e.touches[0].clientX - touchDragState.offsetX}px`;
+            touchDragState.ghostEl.style.top = `${e.touches[0].clientY - touchDragState.offsetY}px`;
+
+            const overEl = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY)?.closest('.image-draggable');
+            if (overEl && overEl !== touchDragState.draggedEl) {
+                if(touchDragState.lastOverEl && touchDragState.lastOverEl !== overEl) touchDragState.lastOverEl.classList.remove('drag-over');
+                overEl.classList.add('drag-over');
+                touchDragState.lastOverEl = overEl;
+            }
+        });
+
+        container.addEventListener('touchend', (e) => {
+            if (!touchDragState.isDragging) return;
+            
+            const dropTarget = touchDragState.lastOverEl;
+            if (dropTarget) {
+                const rect = dropTarget.getBoundingClientRect();
+                const touchX = e.changedTouches[0].clientX;
+                if (touchX - rect.left > rect.width / 2) {
+                    dropTarget.parentNode.insertBefore(touchDragState.draggedEl, dropTarget.nextSibling);
+                } else {
+                    dropTarget.parentNode.insertBefore(touchDragState.draggedEl, dropTarget);
+                }
+                dropTarget.classList.remove('drag-over');
+            }
+
+            touchDragState.draggedEl.classList.remove('dragging');
+            document.body.removeChild(touchDragState.ghostEl);
+            touchDragState = {};
+        });
+      }
+      
+      // Funciones para etiquetas
+      function renderTag(name, color) {
+          const tagEl = document.createElement('div');
+          tagEl.className = 'tag-item flex items-center justify-between text-sm p-1 rounded';
+          tagEl.style.backgroundColor = color;
+          tagEl.dataset.name = name;
+          tagEl.dataset.color = color;
+          
+          const hex = color.replace('#', '');
+          const r = parseInt(hex.substring(0, 2), 16);
+          const g = parseInt(hex.substring(2, 4), 16);
+          const b = parseInt(hex.substring(4, 6), 16);
+          const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+          const textColor = luminance > 0.5 ? 'text-black' : 'text-white';
+          
+          tagEl.innerHTML = `<span class="${textColor} font-semibold">${escapeHtml(name)}</span><button type="button" class="remove-tag-btn ml-2 ${textColor} hover:opacity-75">✖</button>`;
+          
+          tagEl.querySelector('.remove-tag-btn').addEventListener('click', () => tagEl.remove());
+          DOM.tagsContainer.appendChild(tagEl);
+      }
+      
+      function handleAddTag() {
+          const nameInput = document.getElementById('new-tag-name');
+          const colorInput = document.getElementById('new-tag-color');
+          const name = nameInput.value.trim();
+          if (name) {
+              renderTag(name, colorInput.value);
+              nameInput.value = '';
+          }
+      }
+
+      function populateFilterOptions() {
+        DOM.dynamicFiltersContainer.innerHTML = "";
+        
+        const allKeys = new Set(allMinerals.flatMap((m) => m.customData ? Object.keys(m.customData) : []));
+        [...allKeys].filter((key) => key !== INFO_FIELD_NAME).forEach((field) => {
+            const values = [...new Set(allMinerals.flatMap((m) => m.customData?.[field] || []))].sort();
+            if (values.length) {
+              const opts = values.map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+              DOM.dynamicFiltersContainer.insertAdjacentHTML(
+                "beforeend",
+                `<div><label class="block text-sm font-medium">Por ${escapeHtml(field)}</label><select data-field-name="${escapeHtml(field)}" class="dynamic-filter mt-1 block w-full bg-gray-50 dark:bg-gray-700 rounded-md shadow-sm py-2 px-3"><option value="">Todos</option>${opts}</select></div>`
+              );
+            }
+          });
+        
+        const allTags = [...new Set(allMinerals.flatMap(m => m.tags ? m.tags.map(t => t.name) : []))].sort();
+        if (allTags.length > 0) {
+            const tagOptions = allTags.map(tag => `<option value="${escapeHtml(tag)}">${escapeHtml(tag)}</option>`).join('');
+            DOM.dynamicFiltersContainer.insertAdjacentHTML(
+                'beforeend',
+                `<div><label for="filter-by-tag" class="block text-sm font-medium">Por Etiqueta</label><select id="filter-by-tag" class="mt-1 block w-full bg-gray-50 dark:bg-gray-700 rounded-md shadow-sm py-2 px-3"><option value="">Todas</option>${tagOptions}</select></div>`
+            );
+            document.querySelector("#filter-by-tag").addEventListener("input", applyFiltersAndSearch);
+        }
+
+        document.querySelectorAll(".dynamic-filter").forEach((el) => el.addEventListener("input", applyFiltersAndSearch));
+      }
+
+      async function handleExport() {
+        const minerals = await LocalDB.getAll("minerals");
+        const blob = new Blob([JSON.stringify({ minerals }, null, 2)], {
+          type: "application/json",
+        });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `mineral_catalog_${new Date()
+          .toISOString()
+          .slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        showNotification("Catálogo exportado.", "success");
+      }
+      async function handleImport(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const data = JSON.parse(await file.text());
+        for (const mineral of data.minerals || []) {
+          if (!mineral.id) mineral.id = crypto.randomUUID();
+          await LocalDB.put("minerals", mineral);
+          if (authUser)
+            await LocalDB.put("sync_queue", {
+              type: "save",
+              id: mineral.id,
+              payload: { imagesToDelete: [] },
+            });
+        }
+        await loadLocalData();
+        showNotification(`${data.minerals?.length || 0} minerales importados.`, "success");
+        if (isOnline && authUser) processSyncQueue();
+      }
+
+      async function createImageSet(file) {
+        const commonOptions = { useWebWorker: true, exifOrientation: true, fileType: 'image/webp' };
+        
+        const lg_blob = await imageCompression(file, { ...commonOptions, maxWidthOrHeight: 1280, initialQuality: 0.7 });
+        const md_blob = await imageCompression(file, { ...commonOptions, maxWidthOrHeight: 800, initialQuality: 0.7 });
+        const sm_blob = await imageCompression(file, { ...commonOptions, maxWidthOrHeight: 400, initialQuality: 0.6 });
+
+        const placeholder_blob = await imageCompression(file, { ...commonOptions, maxWidthOrHeight: 20 });
+        const placeholder_base64 = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(placeholder_blob);
+        });
+
+        return { lg: lg_blob, md: md_blob, sm: sm_blob, placeholder: placeholder_base64, name: file.name };
+      }
+      
+      async function handleExportToPdf() {
+          DOM.shareModal.classList.add("hidden");
+          DOM.pdfProgressModal.classList.remove('hidden');
+          DOM.pdfProgressModal.classList.add('flex');
+
+          const { jsPDF } = window.jspdf;
+          const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+          const PAGE_WIDTH = doc.internal.pageSize.getWidth();
+          const PAGE_HEIGHT = doc.internal.pageSize.getHeight();
+          const MARGIN = 10;
+          const USABLE_WIDTH = PAGE_WIDTH - (MARGIN * 2);
+          const ITEM_HEIGHT = 50; 
+          const GAP = 8;
+          
+          let cursorY = MARGIN;
+
+          doc.setFontSize(20).setFont(undefined, 'bold').text('Catálogo de Minerales', PAGE_WIDTH / 2, cursorY, { align: 'center' });
+          cursorY += 15;
+
+          for (let i = 0; i < allMinerals.length; i++) {
+              const mineral = allMinerals[i];
+              const progress = ((i + 1) / allMinerals.length) * 100;
+              DOM.pdfProgressText.textContent = `Procesando ${i + 1}/${allMinerals.length}: ${mineral.name}`;
+              DOM.pdfProgressBar.style.width = `${progress}%`;
+
+              if (cursorY + ITEM_HEIGHT > PAGE_HEIGHT - MARGIN) {
+                  doc.addPage();
+                  cursorY = MARGIN;
+              }
+
+              const itemX = MARGIN;
+              const textX = itemX + 40 + 5;
+              const textWidth = USABLE_WIDTH - 40 - 45;
+
+              try {
+                  if (mineral.images && mineral.images.length > 0) {
+                      const imgData = await getOrientedImageDataUrl(mineral.images[0]);
+                      doc.addImage(imgData, 'WEBP', itemX, cursorY, 40, 40);
+                  } else {
+                      doc.setFillColor(240,240,240).rect(itemX, cursorY, 40, 40, 'F');
+                      doc.setTextColor(180,180,180).setFontSize(9).text('Sin Imagen', itemX + 20, cursorY + 22, {align: 'center'});
+                  }
+
+                  doc.setTextColor(0,0,0).setFontSize(14).setFont(undefined, 'bold');
+                  doc.text(mineral.name, textX, cursorY + 10, { maxWidth: textWidth });
+                  doc.setFontSize(10).setFont(undefined, 'normal');
+                  doc.text(normalizeFormula(mineral.formula) || 'N/A', textX, cursorY + 18, { maxWidth: textWidth });
+
+                  const qrX = itemX + USABLE_WIDTH - 40;
+                  const url = `${window.location.origin}/ficha.html?id=${mineral.id}`;
+                  const qrDataUrl = await QRCode.toDataURL(url, { width: 150, errorCorrectionLevel: 'M' });
+                  doc.addImage(qrDataUrl, 'PNG', qrX, cursorY, 40, 40);
+
+              } catch (err) {
+                  logDebug(`Error al procesar PDF para ${mineral.name}: ${err}`, 'error');
+              }
+
+              cursorY += ITEM_HEIGHT;
+              if (i < allMinerals.length - 1) { 
+                doc.setDrawColor(220, 220, 220).line(MARGIN, cursorY, PAGE_WIDTH - MARGIN, cursorY);
+                cursorY += GAP;
+              }
+              await new Promise(resolve => setTimeout(resolve, 10)); 
+          }
+
+          DOM.pdfProgressModal.classList.add('hidden');
+          DOM.pdfProgressModal.classList.remove('flex');
+
+          const pdfBlob = doc.output('blob');
+          const pdfUrl = URL.createObjectURL(pdfBlob);
+          const fileName = `catalogo-minerales-${new Date().toISOString().slice(0, 10)}.pdf`;
+
+          DOM.pdfDownloadButton.href = pdfUrl;
+          DOM.pdfDownloadButton.download = fileName;
+          DOM.pdfDownloadModal.classList.remove('hidden');
+          DOM.pdfDownloadModal.classList.add('flex');
+
+          const downloadAndClose = () => {
+              setTimeout(() => closeDownloadModal(), 150);
+              DOM.pdfDownloadButton.removeEventListener('click', downloadAndClose);
+              DOM.pdfDownloadCloseButton.removeEventListener('click', closeOnly);
+          };
+
+          const closeOnly = () => {
+              closeDownloadModal();
+              DOM.pdfDownloadButton.removeEventListener('click', downloadAndClose);
+              DOM.pdfDownloadCloseButton.removeEventListener('click', closeOnly);
+          };
+          
+          let isClosing = false;
+          const closeDownloadModal = () => {
+              if(isClosing) return;
+              isClosing = true;
+              DOM.pdfDownloadModal.classList.add('hidden');
+              DOM.pdfDownloadModal.classList.remove('flex');
+              URL.revokeObjectURL(pdfUrl);
+          };
+
+          DOM.pdfDownloadButton.addEventListener('click', downloadAndClose);
+          DOM.pdfDownloadCloseButton.addEventListener('click', closeOnly);
+
+          showNotification("PDF generado. Listo para descargar.", "success");
+      }
+
+      async function getOrientedImageDataUrl(image) {
+          const imageUrl = getImageUrl(image, 'lg');
+          const file = image.blobs?.lg ? image.blobs.lg : await (await fetch(imageUrl, {mode: 'cors'})).blob();
+          
+          const options = {
+              maxSizeMB: 1,
+              maxWidthOrHeight: 1024,
+              useWebWorker: true,
+              exifOrientation: true,
+              fileType: 'image/webp'
+          };
+
+          const compressedFile = await imageCompression(file, options);
+
+          return new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result);
+              reader.readAsDataURL(compressedFile);
+          });
+      }
+
+      function setupLazyLoader() {
+        const lazyImages = new Set();
+        const observer = new IntersectionObserver((entries, obs) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    const srcset = img.dataset.srcset;
+                    
+                    if (srcset) {
+                        img.srcset = srcset;
+                        img.addEventListener('load', () => {
+                            img.classList.add('is-loaded');
+                        }, { once: true });
+                    } else {
+                        img.classList.add('is-loaded');
+                    }
+                    obs.unobserve(img);
+                    lazyImages.delete(img);
+                }
+            });
+        });
+        window.lazyLoadObserver = observer;
+        window.lazyImages = lazyImages;
+      }
+
+      document.addEventListener("DOMContentLoaded", main);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo Compartido</title>
+    <meta name="theme-color" content="#039be5"/>
+    <link rel="manifest" href="/manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .mineral-details {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-out;
+        }
+        .is-expanded .mineral-details {
+            max-height: 2000px; /* Un valor suficientemente grande para el contenido */
+            transition: max-height 0.5s ease-in;
+        }
+        .is-expanded .arrow-icon {
+            transform: rotate(180deg);
+        }
+        .arrow-icon {
+            transition: transform 0.3s ease-in-out;
+        }
+        .notification {
+            animation: slideIn 0.5s ease-in-out, fadeOut 0.5s ease-in-out 4.5s forwards;
+        }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+        
+        .lazy-image {
+            filter: blur(20px);
+            transition: filter 0.3s ease-in-out;
+        }
+        .lazy-image.is-loaded {
+            filter: blur(0);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+
+    <nav class="absolute top-4 right-4 text-right z-10">
+        <div id="menu-container" class="relative inline-block text-left">
+            <button id="menu-button" type="button" class="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">
+                Menú
+                <svg class="-mr-1 ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+            </button>
+            <div id="menu-dropdown" class="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 hidden">
+                <div class="py-1" role="menu" aria-orientation="vertical">
+                    <a id="catalog-link" href="/catalog.html" class="text-gray-700 dark:text-gray-200 block px-4 py-2 text-sm" role="menuitem">Catálogo Principal</a>
+                    <a id="stats-link" href="/stats.html" class="text-gray-700 dark:text-gray-200 block px-4 py-2 text-sm" role="menuitem">Estadísticas</a>
+                    <a id="auth-link" href="/login.html" class="text-gray-700 dark:text-gray-200 block px-4 py-2 text-sm" role="menuitem">Iniciar Sesión</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto pt-16 p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 id="header-title" class="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white">Cargando Catálogo...</h1>
+            <p id="header-subtitle" class="text-lg text-gray-500 mt-2">Por favor, espera un momento.</p>
+        </header>
+
+        <main id="catalog-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <!-- Las tarjetas de los minerales se insertarán aquí -->
+        </main>
+        
+        <div id="message-container" class="text-center py-12 hidden">
+             <p class="text-xl text-gray-500"></p>
+        </div>
+    </div>
+    
+    <div id="notification-area" class="fixed top-5 right-5 z-[100] space-y-2"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { firebaseConfig } from "/firebase-config.js";
+        import { escapeHtml, safeColor, formatFormula } from "/utils.js";
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        let currentUser = null;
+
+        const menuButton = document.getElementById('menu-button'), 
+              menuDropdown = document.getElementById('menu-dropdown'), 
+              authLink = document.getElementById('auth-link');
+        
+        menuButton.addEventListener('click', () => menuDropdown.classList.toggle('hidden'));
+        
+        onAuthStateChanged(auth, u => {
+            currentUser = u;
+            const params = new URLSearchParams(window.location.search);
+            const token = params.get('token');
+
+            if (u) {
+                // Usuario CON sesión: los enlaces son normales
+                authLink.textContent = 'Cerrar Sesión';
+                authLink.href = '#';
+                authLink.onclick = e => { e.preventDefault(); signOut(auth).then(() => window.location.href = '/login.html'); };
+                document.getElementById('catalog-link').href = '/catalog.html';
+                document.getElementById('stats-link').href = '/stats.html';
+            } else {
+                // Usuario SIN sesión (anónimo): los enlaces deben mantener el token
+                authLink.textContent = 'Iniciar Sesión';
+                authLink.href = `/login.html?redirect=${encodeURIComponent(window.location.href)}`;
+                authLink.onclick = null;
+                
+                if (token) {
+                    document.getElementById('catalog-link').href = `/share.html?token=${token}`;
+                    document.getElementById('stats-link').href = `/stats.html?token=${token}`;
+                }
+            }
+        });
+
+        const DOM = {
+            title: document.getElementById('header-title'),
+            subtitle: document.getElementById('header-subtitle'),
+            catalog: document.getElementById('catalog-container'),
+            message: document.querySelector('#message-container p'),
+            messageContainer: document.getElementById('message-container'),
+            notificationArea: document.getElementById('notification-area')
+        };
+        
+        function showNotification(message, type = 'info') {
+            const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-blue-500' };
+            const notification = document.createElement('div');
+            notification.className = `notification text-white p-4 rounded-lg shadow-lg ${colors[type]}`;
+            notification.textContent = message;
+            DOM.notificationArea.appendChild(notification);
+            setTimeout(() => notification.remove(), 5000);
+        }
+
+        function showMessage(text) {
+            DOM.catalog.classList.add('hidden');
+            DOM.messageContainer.classList.remove('hidden');
+            DOM.title.textContent = "Error";
+            DOM.subtitle.textContent = "No se pudo cargar el catálogo.";
+            DOM.message.textContent = text;
+        }
+
+        function setupLazyLoader() {
+            const lazyImages = new Set();
+            const observer = new IntersectionObserver((entries, obs) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        const srcset = img.dataset.srcset;
+                        
+                        if (srcset) {
+                            img.srcset = srcset;
+                            img.addEventListener('load', () => {
+                                img.classList.add('is-loaded');
+                            }, { once: true });
+                        } else {
+                            img.classList.add('is-loaded');
+                        }
+                        obs.unobserve(img);
+                        lazyImages.delete(img);
+                    }
+                });
+            });
+            window.lazyLoadObserver = observer;
+            window.lazyImages = lazyImages;
+        }
+
+        function getDisplayImage(image) {
+            const placeholder = image.placeholder || "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+            
+            if (image.urls && image.urls.url_lg) {
+                return {
+                    src: image.placeholder,
+                    srcset: `${image.urls.url_sm} 400w, ${image.urls.url_md} 800w, ${image.urls.url_lg} 1280w`
+                };
+            }
+
+            const singleUrl = image.url || placeholder;
+            return { src: singleUrl, srcset: '' };
+        }
+
+        function createMineralCard(mineral, index = 0) {
+            const card = document.createElement('div');
+            card.className = "bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden";
+            
+            const isAboveTheFold = index < 3; 
+            const firstImgData = mineral.images?.length ? getDisplayImage(mineral.images[0]) : { src: 'https://placehold.co/600x400?text=Sin+Imagen', srcset: '' };
+            
+            const safeName = escapeHtml(mineral.name);
+            const imagesHtml = (mineral.images?.length)
+                ? mineral.images.map(img => {
+                    const displayData = getDisplayImage(img);
+                    return `<img src="${escapeHtml(displayData.src)}" data-srcset="${escapeHtml(displayData.srcset)}" alt="${safeName}" class="lazy-image w-full h-40 object-cover rounded-md mb-2" crossorigin="anonymous">`;
+                }).join('')
+                : '<p class="text-sm text-gray-400">No hay imágenes.</p>';
+
+            const tagsHtml = (mineral.tags || []).map(tag =>
+                `<span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-white last:mr-0 mr-1" style="background-color: ${safeColor(tag.color)};">${escapeHtml(tag.name)}</span>`
+            ).join(' ');
+
+            const infoText = mineral.customData?.['Info']?.join(' ') || '';
+            const otherDetails = mineral.customData ? Object.keys(mineral.customData)
+                .filter(k => k !== 'Info')
+                .sort()
+                .map(k => {
+                    const v = mineral.customData[k];
+                    return (Array.isArray(v) && v.length) ? `<p class="text-sm"><strong>${escapeHtml(k)}:</strong> ${escapeHtml(v.join(', '))}</p>` : '';
+                }).join('') : '';
+
+            card.innerHTML = `
+                <div class="relative cursor-pointer expand-toggle">
+                    <img src="${escapeHtml(firstImgData.src)}" data-srcset="${escapeHtml(firstImgData.srcset)}" alt="${safeName}" class="lazy-image w-full h-48 object-cover" crossorigin="anonymous" ${isAboveTheFold ? 'fetchpriority="high"' : 'loading="lazy"'}>
+                    <div class="absolute top-2 right-2 bg-black/50 p-2 rounded-full">
+                        <svg class="w-4 h-4 text-white arrow-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                </div>
+                <div class="p-4">
+                    <h3 class="text-xl font-bold">${safeName}</h3>
+                    <p class="text-sm text-gray-500 font-mono truncate">${formatFormula(mineral.formula)}</p>
+                    <div class="mt-2">${tagsHtml}</div>
+                </div>
+                <div class="mineral-details px-4 pb-4">
+                    <div class="border-t pt-4">
+                        ${infoText ? `<p class="text-sm text-gray-600 dark:text-gray-400 italic mb-4">${escapeHtml(infoText)}</p>` : ''}
+                        <div class="space-y-1 mb-4">${otherDetails}</div>
+                        <h4 class="font-bold mt-4 mb-2">Galería:</h4>
+                        <div class="grid grid-cols-2 gap-2">${imagesHtml}</div>
+                        <div class="mt-6 text-center">
+                            <a href="/catalog.html?action=add&mineralId=${encodeURIComponent(mineral.id)}" class="add-collection-btn bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md inline-block">
+                                Añadir a mi Colección
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            card.querySelector('.expand-toggle').addEventListener('click', () => {
+                card.classList.toggle('is-expanded');
+            });
+
+            card.querySelector('.add-collection-btn').addEventListener('click', (e) => {
+                if (!currentUser) {
+                    e.preventDefault(); 
+                    showNotification("Debes iniciar sesión para añadir minerales.");
+                    setTimeout(() => {
+                        window.location.href = `/login.html?redirect=${encodeURIComponent(window.location.href)}`;
+                    }, 2000);
+                }
+            });
+            
+            return card;
+        }
+
+        async function main() {
+            setupLazyLoader();
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const token = params.get('token');
+
+                if (!token) {
+                    return showMessage("El enlace para compartir no es válido o está incompleto.");
+                }
+
+                const tokenRef = doc(db, 'share_links', token);
+                const tokenSnap = await getDoc(tokenRef);
+
+                if (!tokenSnap.exists()) {
+                    return showMessage("Este enlace para compartir no es válido o ha sido revocado.");
+                }
+                
+                const userId = tokenSnap.data().userId;
+
+                const publicMineralsRef = collection(db, 'public_minerals');
+                const q = query(publicMineralsRef, where("owner", "==", userId));
+                const querySnapshot = await getDocs(q);
+
+                const minerals = [];
+                querySnapshot.forEach(doc => minerals.push({ id: doc.id, ...doc.data() }));
+
+                if (minerals.length === 0) {
+                    DOM.title.textContent = "Catálogo Vacío";
+                    DOM.subtitle.textContent = "Este usuario aún no ha compartido ningún mineral.";
+                    return;
+                }
+                
+                DOM.title.textContent = "Catálogo Compartido";
+                DOM.subtitle.textContent = `Viendo la colección de un usuario. (${minerals.length} minerales)`;
+                
+                if(window.lazyImages) {
+                    window.lazyImages.forEach(img => window.lazyLoadObserver.unobserve(img));
+                    window.lazyImages.clear();
+                }
+                DOM.catalog.innerHTML = '';
+
+                minerals.sort((a,b) => a.name.localeCompare(b.name)).forEach((mineral, index) => {
+                    const card = createMineralCard(mineral, index);
+                    DOM.catalog.appendChild(card);
+                    card.querySelectorAll('.lazy-image').forEach(img => {
+                        window.lazyImages.add(img);
+                        window.lazyLoadObserver.observe(img);
+                    });
+                });
+
+            } catch (error) {
+                console.error("Error al cargar el catálogo compartido:", error);
+                showMessage("Ocurrió un error inesperado al intentar cargar los datos.");
+            }
+        }
+
+        main();
+    </script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Service Worker registrado en share.html.', reg))
+                    .catch(err => console.log('Error en registro de Service Worker:', err));
+            });
+        }
+    </script>
+</body>
+</html>

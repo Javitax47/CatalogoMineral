@@ -1,0 +1,18 @@
+[
+    {
+      "origin": [
+        "https://catalogomineral-4b80f.web.app",
+        "http://localhost:*"
+      ],
+      "method": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE"
+      ],
+      "responseHeader": [
+        "Content-Type"
+      ],
+      "maxAgeSeconds": 3600
+    }
+  ]

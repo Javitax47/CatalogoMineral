@@ -1,0 +1,20 @@
+{
+  "name": "Catálogo de Minerales",
+  "short_name": "Minerales",
+  "start_url": "/catalog.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#039be5",
+  "icons": [
+    {
+      "src": "/icons/icon-128x128.png",
+      "type": "image/png",
+      "sizes": "128x128"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}

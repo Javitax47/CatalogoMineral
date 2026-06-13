@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ficha de Mineral</title>
+    
+    <meta name="theme-color" content="#039be5"/>
+    <link rel="manifest" href="/manifest.json">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .notification {
+            animation: slideIn 0.5s ease-in-out, fadeOut 0.5s ease-in-out 4.5s forwards;
+        }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 flex items-center justify-center min-h-screen p-4">
+
+    <nav class="absolute top-4 right-4 text-right z-10">
+        <div id="menu-container" class="relative inline-block text-left">
+            <button id="menu-button" type="button" class="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">
+                Menú
+                <svg class="-mr-1 ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+            </button>
+            <div id="menu-dropdown" class="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 hidden">
+                <div class="py-1" role="menu" aria-orientation="vertical">
+                    <a href="/catalog.html" class="text-gray-700 dark:text-gray-200 block px-4 py-2 text-sm" role="menuitem">Catálogo Principal</a>
+                    <a href="/stats.html" class="text-gray-700 dark:text-gray-200 block px-4 py-2 text-sm" role="menuitem">Estadísticas</a>
+                    <a id="auth-link" href="/login.html" class="text-gray-700 dark:text-gray-200 block px-4 py-2 text-sm" role="menuitem">Iniciar Sesión</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main id="card-container" class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 w-full max-w-2xl hidden">
+        <header class="text-center border-b-2 border-blue-500 pb-4 mb-6">
+            <h1 id="mineral-name" class="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white">Cargando...</h1>
+            <p id="mineral-formula" class="text-lg text-gray-500 dark:text-gray-400 font-mono mt-2"></p>
+        </header>
+
+        <div id="image-gallery" class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+             <div id="gallery-placeholder" class="hidden col-span-full text-center p-4 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                <p class="text-gray-500 dark:text-gray-400">Conéctate a internet para ver la galería de imágenes.</p>
+            </div>
+        </div>
+
+        <div id="custom-details-container" class="space-y-4">
+            <!-- Los detalles se insertarán aquí -->
+        </div>
+        
+        <div class="mt-8 text-center">
+            <button id="addToCollectionBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg">
+                Incluir a mi Colección
+            </button>
+        </div>
+    </main>
+
+    <div id="loading-indicator" class="text-center">
+        <p class="text-lg text-gray-500">Leyendo datos del QR...</p>
+    </div>
+
+    <div id="error-message" class="hidden text-center bg-red-100 dark:bg-red-900 border border-red-400 text-red-700 dark:text-red-200 px-4 py-3 rounded-lg">
+        <p>No se pudo encontrar el mineral. El QR puede ser inválido o se requiere conexión a internet.</p>
+    </div>
+
+    <div id="notification-area" class="fixed top-5 right-5 z-[100] space-y-2"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { firebaseConfig } from "/firebase-config.js";
+        import { escapeHtml, formatFormula } from "/utils.js";
+
+        let currentMineralId = null;
+        let currentUser = null;
+    
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        const menuButton = document.getElementById('menu-button'), menuDropdown = document.getElementById('menu-dropdown'), authLink = document.getElementById('auth-link');
+        menuButton.addEventListener('click', () => menuDropdown.classList.toggle('hidden'));
+        onAuthStateChanged(auth, u => { 
+            currentUser = u;
+            if(u) { authLink.textContent='Cerrar Sesión'; authLink.href='#'; authLink.onclick=e=>{ e.preventDefault(); signOut(auth).then(() => window.location.href = '/login.html'); }; }
+            else { authLink.textContent='Iniciar Sesión'; authLink.href='/login.html'; authLink.onclick=null; }
+        });
+    
+        const DOM = {
+            cardContainer: document.getElementById('card-container'), loadingIndicator: document.getElementById('loading-indicator'), errorMessage: document.getElementById('error-message'), name: document.getElementById('mineral-name'), formula: document.getElementById('mineral-formula'), gallery: document.getElementById('image-gallery'), galleryPlaceholder: document.getElementById('gallery-placeholder'), detailsContainer: document.getElementById('custom-details-container'), addToCollectionBtn: document.getElementById('addToCollectionBtn'), notificationArea: document.getElementById('notification-area')
+        };
+        
+        function showNotification(message, type = 'success') {
+            const c = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-blue-500' }; 
+            const n = document.createElement('div'); 
+            n.className = `notification text-white p-4 rounded-lg shadow-lg ${c[type]}`;
+            n.textContent = message;
+            DOM.notificationArea.appendChild(n); 
+            setTimeout(() => n.remove(), 5000); 
+        }
+    
+        function renderMineralData(data, source = 'offline') {
+            document.title = data.name || 'Ficha de Mineral';
+            DOM.name.textContent = data.name || 'Sin nombre';
+            DOM.formula.innerHTML = formatFormula(data.formula);
+            DOM.detailsContainer.innerHTML = '';
+
+            const infoText = data.customData?.['Info']?.join(' ') || '';
+            if (infoText) {
+                DOM.detailsContainer.insertAdjacentHTML('beforeend', `<p class="text-gray-600 dark:text-gray-400 italic mb-4">${escapeHtml(infoText)}</p>`);
+            }
+
+            const otherDetailsHtml = data.customData ? Object.keys(data.customData).filter(k => k !== 'Info').sort().map(k => {
+                const v = data.customData[k];
+                return (Array.isArray(v) && v.length) ? `<div class="flex justify-between py-2 border-b dark:border-gray-700"><strong class="font-medium text-gray-800 dark:text-gray-200">${escapeHtml(k)}:</strong><span class="text-gray-600 dark:text-gray-400">${escapeHtml(v.join(', '))}</span></div>` : '';
+            }).join('') : '';
+            DOM.detailsContainer.insertAdjacentHTML('beforeend', otherDetailsHtml);
+    
+            DOM.gallery.innerHTML = '';
+            if (source === 'online' && data.images?.length) {
+                data.images.forEach(img => {
+                    const imgEl = document.createElement('img');
+                    imgEl.src = img.url; imgEl.alt = data.name; imgEl.className = "w-full h-64 object-cover rounded-lg shadow-md"; imgEl.crossorigin="anonymous";
+                    DOM.gallery.appendChild(imgEl);
+                });
+            } else if (source === 'offline') {
+                DOM.galleryPlaceholder.classList.remove('hidden');
+                DOM.gallery.appendChild(DOM.galleryPlaceholder);
+            } else {
+                DOM.gallery.innerHTML = '<p class="text-gray-400 col-span-full text-center">No hay imágenes disponibles.</p>';
+            }
+    
+            DOM.loadingIndicator.classList.add('hidden');
+            DOM.errorMessage.classList.add('hidden');
+            DOM.cardContainer.classList.remove('hidden');
+        }
+    
+        async function main() {
+            const params = new URLSearchParams(window.location.search);
+            currentMineralId = params.get('id');
+            const dataParam = params.get('data');
+            let hasRenderedFromUrl = false;
+    
+            if (dataParam) {
+                try {
+                    const offlineData = JSON.parse(decodeURIComponent(dataParam));
+                    renderMineralData(offlineData, 'offline');
+                    hasRenderedFromUrl = true;
+                } catch (error) { console.error("Error al parsear datos de la URL:", error); }
+            }
+            
+            if (navigator.onLine && currentMineralId) {
+                try {
+                    const docRef = doc(db, 'public_minerals', currentMineralId);
+                    const docSnap = await getDoc(docRef);
+                    if (docSnap.exists()) {
+                        renderMineralData(docSnap.data(), 'online');
+                    } else if (!hasRenderedFromUrl) {
+                        throw new Error("El mineral no existe en la base de datos.");
+                    }
+                } catch (error) {
+                    console.error("Error al cargar desde Firebase:", error);
+                    if (!hasRenderedFromUrl) { DOM.loadingIndicator.classList.add('hidden'); DOM.errorMessage.classList.remove('hidden'); }
+                }
+            } else if (!hasRenderedFromUrl) {
+                DOM.loadingIndicator.classList.add('hidden');
+                DOM.errorMessage.classList.remove('hidden');
+            }
+        }
+    
+        DOM.addToCollectionBtn.addEventListener('click', () => {
+            if (!currentMineralId) return showNotification("ID del mineral no encontrado.", "error");
+            if (currentUser) {
+                showNotification("Añadiendo a tu colección...", "info");
+                window.location.href = `${window.location.origin}/catalog.html?action=add&mineralId=${currentMineralId}`;
+            } else {
+                showNotification("Inicia sesión para guardar minerales.", "info");
+                setTimeout(() => { window.location.href = `${window.location.origin}/login.html?redirect=${encodeURIComponent(window.location.href)}`; }, 2000);
+            }
+        });
+    
+        main();
+    </script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Service Worker registrado en ficha.html.', reg))
+                    .catch(err => console.log('Error en registro de Service Worker:', err));
+            });
+        }
+    </script>
+</body>
+</html>

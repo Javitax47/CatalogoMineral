@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estadísticas del Catálogo</title>
+    <meta name="theme-color" content="#039be5"/>
+    <link rel="manifest" href="/manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .tab-button[aria-selected="true"] {
+            border-color: #3b82f6;
+            color: #3b82f6;
+            font-weight: 600;
+        }
+        details > summary {
+            cursor: pointer;
+            list-style: none; /* Ocultar el marcador por defecto */
+        }
+        details > summary::-webkit-details-marker {
+            display: none; /* Ocultar el marcador en Chrome/Safari */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+
+    <nav class="absolute top-4 right-4 text-right z-10">
+        <div id="menu-container" class="relative inline-block text-left">
+            <button id="menu-button" type="button" class="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">
+                Menú
+                <svg class="-mr-1 ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+            </button>
+            <div id="menu-dropdown" class="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 hidden">
+                <div class="py-1" role="menu" aria-orientation="vertical">
+                    <a id="catalog-link" href="/catalog.html" class="text-gray-700 dark:text-gray-200 block px-4 py-2 text-sm" role="menuitem">Catálogo Principal</a>
+                    <a id="stats-link" href="/stats.html" class="text-gray-700 dark:text-gray-200 block px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700" role="menuitem">Estadísticas</a>
+                    <a id="auth-link" href="/login.html" class="text-gray-700 dark:text-gray-200 block px-4 py-2 text-sm" role="menuitem">Iniciar Sesión</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto pt-16 p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white">Estadísticas del Catálogo</h1>
+        </header>
+
+        <div id="stats-content" class="hidden">
+            <!-- Pestañas de Navegación -->
+            <div class="mb-4 border-b border-gray-200 dark:border-gray-700">
+                <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                    <button class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300" data-tab="summary" aria-selected="true">Resumen</button>
+                    <button class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300" data-tab="fields" aria-selected="false">Análisis de Campos</button>
+                    <button class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300" data-tab="evolution" aria-selected="false">Evolución</button>
+                </nav>
+            </div>
+
+            <!-- Contenido de las Pestañas -->
+            <div id="tab-content-summary">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md text-center"><h2 class="text-lg font-semibold text-gray-500 dark:text-gray-400">Total de Minerales</h2><p id="total-minerals" class="text-5xl font-bold text-blue-600 dark:text-blue-400 mt-2">0</p></div>
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md text-center"><h2 class="text-lg font-semibold text-gray-500 dark:text-gray-400">Total de Imágenes</h2><p id="total-images" class="text-5xl font-bold text-green-600 dark:text-green-400 mt-2">0</p></div>
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md text-center"><h2 class="text-lg font-semibold text-gray-500 dark:text-gray-400">Minerales Favoritos</h2><p id="total-favorites" class="text-5xl font-bold text-yellow-500 dark:text-yellow-400 mt-2">0</p></div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                     <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+                        <details>
+                            <summary class="flex justify-between items-center">
+                                <h3 class="text-xl font-semibold">Índice de Calidad de Datos</h3>
+                                <!-- Icono de flecha que rota -->
+                                <svg class="w-5 h-5 text-gray-500 transition-transform transform details-arrow" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            </summary>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 my-2">Puntuación basada en la compleción de campos clave ponderados. Haz clic para ver detalles y consejos.</p>
+                            <div class="w-full bg-gray-200 rounded-full h-8 dark:bg-gray-700 relative"><div id="quality-score-bar" class="bg-gradient-to-r from-blue-500 to-green-500 h-8 rounded-full text-center text-white font-bold flex items-center justify-center" style="width: 0%">0%</div></div>
+                            <div id="quality-tips-container" class="mt-4 text-sm text-gray-700 dark:text-gray-300 border-t pt-4 space-y-4">
+                                <!-- Los consejos dinámicos se insertarán aquí -->
+                            </div>
+                        </details>
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-semibold mb-4">Superlativos del Catálogo</h3>
+                        <ul class="space-y-2 text-gray-700 dark:text-gray-300 text-sm">
+                            <li id="longest-name" class="flex justify-between"><strong>Nombre más largo:</strong> <span></span></li>
+                            <li id="longest-info" class="flex justify-between"><strong>Descripción más larga:</strong> <span></span></li>
+                            <li id="most-images" class="flex justify-between"><strong>Mineral con más imágenes:</strong> <span></span></li>
+                            <li id="latest-update" class="flex justify-between"><strong>Última actualización:</strong> <span></span></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-content-fields" class="hidden">
+                <div id="charts-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-8"></div>
+            </div>
+
+            <div id="tab-content-evolution" class="hidden">
+                 <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+                    <h3 class="text-xl font-semibold mb-4 text-center">Crecimiento de la Colección (por fecha de actualización)</h3>
+                    <canvas id="evolution-chart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div id="loading-stats" class="text-center py-12"><p class="text-lg text-gray-500">Cargando y analizando datos...</p></div>
+    </div>
+
+    <script type="module">
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, getDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { firebaseConfig } from "/firebase-config.js";
+        import { escapeHtml } from "/utils.js";
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const menuButton = document.getElementById('menu-button'),
+            menuDropdown = document.getElementById('menu-dropdown'),
+            authLink = document.getElementById('auth-link');
+        
+        menuButton.addEventListener('click', () => menuDropdown.classList.toggle('hidden'));
+        
+        onAuthStateChanged(auth, u => {
+            const params = new URLSearchParams(window.location.search);
+            const token = params.get('token');
+
+            if (u) {
+                authLink.textContent = 'Cerrar Sesión';
+                authLink.href = '#';
+                authLink.onclick = e => { e.preventDefault(); signOut(auth).then(() => window.location.href = '/login.html'); };
+                document.getElementById('catalog-link').href = '/catalog.html';
+                document.getElementById('stats-link').href = '/stats.html';
+            } else {
+                authLink.textContent = 'Iniciar Sesión';
+                authLink.href = `/login.html?redirect=${encodeURIComponent(window.location.href)}`;
+                authLink.onclick = null;
+                if (token) {
+                    document.getElementById('catalog-link').href = `/share.html?token=${token}`;
+                    document.getElementById('stats-link').href = `/stats.html?token=${token}`;
+                }
+            }
+        });
+
+        const tabs = document.querySelectorAll('.tab-button');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.setAttribute('aria-selected', 'false'));
+                tab.setAttribute('aria-selected', 'true');
+                document.querySelectorAll('[id^="tab-content-"]').forEach(c => c.classList.add('hidden'));
+                document.getElementById(`tab-content-${tab.dataset.tab}`).classList.remove('hidden');
+            });
+        });
+
+        const LocalDB = {
+            DB_NAME: 'MineralCatalogDB',
+            DB_VERSION: 1,
+            db: null,
+            async open() {
+                if (this.db) return;
+                return new Promise((resolve, reject) => {
+                    const r = indexedDB.open(this.DB_NAME, this.DB_VERSION);
+                    r.onerror = (e) => reject(`Error de IndexedDB: ${e.target.error}`);
+                    r.onsuccess = (e) => { this.db = e.target.result; resolve(); };
+                    r.onupgradeneeded = (e) => { e.target.result.createObjectStore('minerals', { keyPath: 'id' }); };
+                });
+            },
+            async getAll(storeName) {
+                await this.open();
+                return new Promise((resolve, reject) => {
+                    const tx = this.db.transaction(storeName, 'readonly');
+                    const store = tx.objectStore(storeName);
+                    const req = store.getAll();
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = (e) => reject(`Error al obtener todo de ${storeName}: ${e.target.error}`);
+                });
+            }
+        };
+
+        function createChart(field, type, data, uniqueCount) {
+            const container = document.getElementById('charts-grid');
+            const chartWrapper = document.createElement('div');
+            if (!data.labels.length) return;
+            const canvas = document.createElement('canvas');
+            chartWrapper.innerHTML = `<h3 class="text-xl font-semibold mb-4 text-center">Top 5 ${escapeHtml(field)} <span class="text-sm font-normal text-gray-500">(${uniqueCount} únicos)</span></h3>`;
+            chartWrapper.appendChild(canvas);
+            container.appendChild(chartWrapper);
+            new Chart(canvas, { type, data, options: { indexAxis: type === 'bar' ? 'y' : 'x', plugins: { legend: { display: type === 'doughnut' } } } });
+        }
+
+        async function getMineralsData() {
+            const params = new URLSearchParams(window.location.search);
+            const token = params.get('token');
+
+            if (token) {
+                document.querySelector('h1').textContent = "Estadísticas del Catálogo Compartido";
+                document.getElementById('loading-stats').querySelector('p').textContent = "Cargando y analizando datos compartidos...";
+                console.log("Modo compartido detectado. Obteniendo datos desde Firestore...");
+
+                const tokenRef = doc(db, 'share_links', token);
+                const tokenSnap = await getDoc(tokenRef);
+                if (!tokenSnap.exists()) throw new Error("Token de compartición no válido.");
+                
+                const userId = tokenSnap.data().userId;
+                const q = query(collection(db, 'public_minerals'), where("owner", "==", userId));
+                const querySnapshot = await getDocs(q);
+                
+                const minerals = [];
+                querySnapshot.forEach(doc => minerals.push(doc.data()));
+                return minerals;
+
+            } else {
+                document.getElementById('loading-stats').querySelector('p').textContent = "Cargando y analizando datos locales...";
+                console.log("Modo local detectado. Obteniendo datos desde IndexedDB...");
+                return LocalDB.getAll('minerals');
+            }
+        }
+
+        async function generateStats() {
+            console.log("Iniciando generateStats...");
+            try {
+                const minerals = await getMineralsData();
+                
+                console.log(`Se encontraron ${minerals.length} minerales para analizar.`);
+                if (!minerals || minerals.length === 0) {
+                    document.getElementById("loading-stats").textContent = "No hay minerales para generar estadísticas.";
+                    return;
+                }
+                
+                const KEY_FIELD_WEIGHTS = {
+                    images: 3,
+                    formula: 2,
+                    'Info': 1,
+                    'Color': 1.5,
+                    'Dureza': 1.5,
+                    'Lustre': 1,
+                    'Raya': 1,
+                    'Sistema Cristalino': 1.5
+                };
+                const totalPossibleWeight = Object.values(KEY_FIELD_WEIGHTS).reduce((sum, weight) => sum + weight, 0);
+
+                let totalImages = 0, totalFavorites = 0, latestUpdate = {name: 'N/A', date: 0}, mostImages = {name: 'N/A', count: 0}, longestName = {name: '', len: 0}, longestInfo = {name: '', len: 0};
+                const allFieldCounts = {}, monthlyAdditions = {}, qualityScores = [];
+                const missingFieldCounts = {};
+
+                minerals.forEach(m => {
+                    if (m.isFavorite) totalFavorites++;
+
+                    let currentWeight = 0;
+                    const missingFields = [];
+
+                    // Chequeo de campos clave
+                    if (m.images?.length > 0) {
+                        currentWeight += KEY_FIELD_WEIGHTS.images;
+                    } else {
+                        missingFields.push('Imágenes');
+                        missingFieldCounts['Imágenes'] = (missingFieldCounts['Imágenes'] || 0) + 1;
+                    }
+
+                    if (m.formula?.trim()) {
+                        currentWeight += KEY_FIELD_WEIGHTS.formula;
+                    } else {
+                        missingFields.push('Fórmula');
+                        missingFieldCounts['Fórmula'] = (missingFieldCounts['Fórmula'] || 0) + 1;
+                    }
+
+                    for(const field in KEY_FIELD_WEIGHTS) {
+                        if (field === 'images' || field === 'formula') continue;
+                        if (m.customData?.[field]?.some(v => v.trim() !== '')) {
+                            currentWeight += KEY_FIELD_WEIGHTS[field];
+                        } else {
+                            missingFields.push(field);
+                            missingFieldCounts[field] = (missingFieldCounts[field] || 0) + 1;
+                        }
+                    }
+                    
+                    qualityScores.push({
+                        name: m.name,
+                        score: currentWeight / totalPossibleWeight,
+                        missing: missingFields
+                    });
+
+                    const imgCount = m.images?.length || 0;
+                    totalImages += imgCount;
+                    if (imgCount > mostImages.count) mostImages = { name: m.name, count: imgCount };
+                    
+                    const updatedAt = new Date(m.updatedAt || new Date());
+                    if (updatedAt.getTime() > latestUpdate.date) latestUpdate = { name: m.name, date: updatedAt.getTime() };
+                    
+                    const monthKey = `${updatedAt.getFullYear()}-${String(updatedAt.getMonth() + 1).padStart(2, '0')}`;
+                    monthlyAdditions[monthKey] = (monthlyAdditions[monthKey] || 0) + 1;
+                    if (m.name.length > longestName.len) longestName = { name: m.name, len: m.name.length };
+                    const infoLen = m.customData?.['Info']?.[0]?.length || 0;
+                    if (infoLen > longestInfo.len) longestInfo = { name: m.name, len: infoLen };
+
+                    if (!m.customData) return;
+                    for (const [field, values] of Object.entries(m.customData)) {
+                        if (field === 'Info') continue;
+                        if (!allFieldCounts[field]) allFieldCounts[field] = {};
+                        if(Array.isArray(values)) values.forEach(val => allFieldCounts[field][val] = (allFieldCounts[field][val] || 0) + 1);
+                    }
+                });
+
+                document.getElementById('total-minerals').textContent = minerals.length;
+                document.getElementById('total-images').textContent = totalImages;
+                document.getElementById('total-favorites').textContent = totalFavorites;
+                
+                const avgQuality = (qualityScores.reduce((acc, curr) => acc + curr.score, 0) / minerals.length * 100).toFixed(0);
+                const qualityBar = document.getElementById('quality-score-bar');
+                qualityBar.style.width = `${avgQuality}%`;
+                qualityBar.textContent = `${avgQuality}%`;
+                
+                // --- Generación de Consejos Dinámicos ---
+                const tipsContainer = document.getElementById('quality-tips-container');
+                tipsContainer.innerHTML = ''; // Limpiar
+                if (avgQuality >= 100) {
+                    tipsContainer.innerHTML = `<p class="text-green-600 dark:text-green-400 font-semibold">¡Felicidades! La calidad de datos de tu catálogo es excelente.</p>`;
+                } else {
+                    const sortedMissingFields = Object.entries(missingFieldCounts).sort((a, b) => b[1] - a[1]);
+                    if (sortedMissingFields.length > 0) {
+                        let missingFieldsHtml = '<div><h4 class="font-semibold mb-2">Campos Clave Faltantes con Más Frecuencia:</h4><ul class="list-disc list-inside space-y-1">';
+                        sortedMissingFields.slice(0, 3).forEach(([field, count]) => {
+                            missingFieldsHtml += `<li><strong>${escapeHtml(field)}:</strong> faltante en ${count} minerales.</li>`;
+                        });
+                        missingFieldsHtml += '</ul></div>';
+                        tipsContainer.innerHTML += missingFieldsHtml;
+                    }
+
+                    const mineralsToImprove = qualityScores.sort((a, b) => a.score - b.score).slice(0, 3);
+                    if (mineralsToImprove.length > 0 && mineralsToImprove[0].score < 1) {
+                        let improveMineralsHtml = '<div><h4 class="font-semibold mb-2">Minerales con Oportunidades de Mejora:</h4><ul class="list-disc list-inside space-y-1">';
+                        mineralsToImprove.forEach(m => {
+                            improveMineralsHtml += `<li><strong>${escapeHtml(m.name)}:</strong> Le faltan datos en: <em>${escapeHtml(m.missing.join(', '))}</em>.</li>`;
+                        });
+                        improveMineralsHtml += '</ul></div>';
+                        tipsContainer.innerHTML += improveMineralsHtml;
+                    }
+                }
+                
+                document.querySelector('#longest-name span').textContent = longestName.name;
+                document.querySelector('#longest-info span').textContent = longestInfo.name;
+                document.querySelector('#most-images span').textContent = `${mostImages.name} (${mostImages.count})`;
+                document.querySelector('#latest-update span').textContent = `${latestUpdate.name} (${new Date(latestUpdate.date).toLocaleDateString()})`;
+
+                const sortedFields = Object.keys(allFieldCounts).sort((a,b) => a.localeCompare(b));
+                document.getElementById('charts-grid').innerHTML = '';
+                for (const field of sortedFields) {
+                    const top5 = Object.entries(allFieldCounts[field]).sort((a, b) => b[1] - a[1]).slice(0, 5);
+                    createChart(field, field.toLowerCase() === 'color' ? 'doughnut' : 'bar', {
+                        labels: top5.map(i => i[0]),
+                        datasets: [{ data: top5.map(i => i[1]), backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'] }]
+                    }, Object.keys(allFieldCounts[field]).length);
+                }
+
+                const sortedMonths = Object.keys(monthlyAdditions).sort();
+                const evolutionCtx = document.getElementById('evolution-chart');
+                new Chart(evolutionCtx, {
+                    type: 'line',
+                    data: { labels: sortedMonths, datasets: [{ label: 'Minerales Actualizados', data: sortedMonths.map(m => monthlyAdditions[m]), fill: false, borderColor: 'rgb(75, 192, 192)', tension: 0.1 }] }
+                });
+
+                document.getElementById("loading-stats").classList.add("hidden");
+                document.getElementById("stats-content").classList.remove("hidden");
+                
+            } catch (e) {
+                document.getElementById("loading-stats").querySelector('p').textContent = `Error: ${e.message}`;
+                console.error("Error generando estadísticas:", e);
+            }
+        }
+
+        generateStats();
+    </script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js');
+            });
+        }
+    </script>
+</body>
+</html>
