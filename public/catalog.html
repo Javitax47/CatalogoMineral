@@ -406,13 +406,13 @@
       class="fixed inset-0 z-50 items-center justify-center flex hidden modal-backdrop"
     >
       <div
-        class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 w-full max-w-md m-4"
+        class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 w-full max-w-md m-4 max-h-[90vh] overflow-y-auto flex flex-col"
       >
         <h2 class="text-xl font-bold mb-4">Gestionar Campos del Mineral</h2>
         <p class="text-sm text-gray-500 mb-4">
           Añade o elimina campos para este mineral específico.
         </p>
-        <div id="field-list" class="space-y-2 mb-4"></div>
+        <div id="field-list" class="space-y-2 mb-4 max-h-[45vh] overflow-y-auto pr-1"></div>
         <div class="flex gap-2">
           <input
             type="text"
