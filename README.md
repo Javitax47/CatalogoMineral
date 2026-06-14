@@ -4,6 +4,12 @@ Aplicación web progresiva (PWA) para catalogar, gestionar y compartir una
 colección de minerales. Funciona sin conexión gracias a IndexedDB y un service
 worker, y sincroniza los datos con Firebase cuando hay red.
 
+## Demo
+
+- **Aplicación**: https://catalogomineral-4b80f.web.app/
+- **Catálogo de muestra** (vista compartida de solo lectura):
+  https://catalogomineral-4b80f.web.app/share.html?token=ttjBF1csO2fF6nYKBFluUsR7f7s1
+
 ## Características
 
 - **Offline-first**: añade, edita y consulta minerales sin conexión; los cambios
