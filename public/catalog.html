@@ -917,6 +917,7 @@
 
         for (const action of queue) {
           let opSuccess = false;
+          let syncedImages = null;
           try {
             const batch = writeBatch(db);
             if (action.type === "delete") {
@@ -952,24 +953,33 @@
               }
               const finalImages = [];
               for (const img of local.images || []) {
-                if (img.storagePaths && Object.keys(img.storagePaths).length > 0) {
-                    finalImages.push(img); // Already uploaded
+                const hasStoragePaths = img.storagePaths && Object.keys(img.storagePaths).length > 0;
+                if (hasStoragePaths) {
+                    finalImages.push(img); // Ya subida
                 } else if (img.blobs) {
                     const imageId = crypto.randomUUID();
                     const newImageEntry = { urls: {}, storagePaths: {}, placeholder: img.placeholder, name: img.name };
                     for (const size in img.blobs) { // size is 'sm', 'md', 'lg'
+                        const source = img.blobs[size];
+                        // El blob puede estar ya como objeto Blob (en memoria) o como
+                        // data-URL base64 (en IndexedDB). Solo hace falta fetch en el segundo caso.
+                        const blob = source instanceof Blob ? source : await (await fetch(source)).blob();
                         const storagePath = `users/${authUser.uid}/images/${local.id}-${imageId}_${size}.webp`;
                         const storageRef = ref(storage, storagePath);
-                        const blob = await (await fetch(img.blobs[size])).blob(); // Ensure it's a real blob from base64
                         await uploadBytes(storageRef, blob);
                         const url = await getDownloadURL(storageRef);
                         newImageEntry.urls[`url_${size}`] = url;
                         newImageEntry.storagePaths[`path_${size}`] = storagePath;
                     }
                     finalImages.push(newImageEntry);
+                } else if ((img.urls && Object.keys(img.urls).length > 0) || img.url) {
+                    // Imagen con URL pero sin blobs locales (p. ej. ya sincronizada en otra
+                    // sesión): la conservamos en lugar de descartarla.
+                    finalImages.push(img);
                 }
               }
-              const payload = { ...local, images: finalImages.map(({ blobs, ...rest }) => rest), owner: authUser.uid };
+              syncedImages = finalImages.map(({ blobs, ...rest }) => rest);
+              const payload = { ...local, images: syncedImages, owner: authUser.uid };
               delete payload.id;
               batch.set(doc(mineralsCollectionRef, action.id), payload, { merge: true });
               batch.set(doc(publicMineralsCollectionRef, action.id), payload, { merge: true });
@@ -988,11 +998,21 @@
           }
           if (opSuccess) {
             await LocalDB.delete("sync_queue", action.id);
+            // Tras subir las imágenes actualizamos el registro local con las URLs
+            // definitivas (sin los blobs base64) para que coincida con Firestore y
+            // no se vuelvan a subir en la siguiente sincronización.
+            if (action.type === "save" && syncedImages) {
+              const stored = await LocalDB.get("minerals", action.id);
+              if (stored) {
+                stored.images = syncedImages;
+                await LocalDB.put("minerals", stored);
+              }
+            }
             logDebug(`Éxito para la acción ${action.id}.`, "success");
           }
         }
         logDebug("Cola de sincronización procesada.", "success");
-        await applyFiltersAndSearch();
+        await loadLocalData();
         const remainingQueue = await LocalDB.getAll("sync_queue");
         if (remainingQueue.length === 0 && isOnline) {
           updateSyncStatus("online", "Sincronizado");
