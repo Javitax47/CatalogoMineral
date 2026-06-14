@@ -7,7 +7,7 @@ worker, y sincroniza los datos con Firebase cuando hay red.
 ## Demo
 
 - **Aplicación**: https://catalogomineral-4b80f.web.app/
-- **Catálogo de muestra** (vista compartida de solo lectura):
+- **Mi colección personal** (vista compartida de solo lectura):
   https://catalogomineral-4b80f.web.app/share.html?token=ttjBF1csO2fF6nYKBFluUsR7f7s1
 
 ## Características
